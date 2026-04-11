@@ -1,0 +1,18 @@
+app = "hive-swarm-post"
+primary_region = "iad"
+
+[build]
+
+[env]
+  BOT_ACCOUNT = "swarmpost"
+
+# No HTTP service — this is a scheduled job
+# Runs hourly via Fly Machines scheduled start
+
+[[machines]]
+  auto_destroy = true
+
+  [machines.guest]
+    cpu_kind = "shared"
+    cpus = 1
+    memory_mb = 256

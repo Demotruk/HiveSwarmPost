@@ -1,0 +1,23 @@
+{
+  "name": "hive-swarm-post",
+  "version": "1.0.0",
+  "description": "Daily automated Hive blockchain bot that distributes author rewards to newly onboarded users via trust-weighted lottery",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@hiveio/dhive": "^1.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.2.0"
+  }
+}
