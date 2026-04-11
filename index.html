@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hive Swarm Post — Trust Manager</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --border: #2a2d3a;
+      --text: #e0e0e0;
+      --text-muted: #888;
+      --accent: #e31337;
+      --accent-hover: #ff1a45;
+      --green: #2ecc71;
+      --yellow: #f1c40f;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+    h1 { font-size: 1.5rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--text-muted); }
+    .subtitle { color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .container { max-width: 700px; margin: 0 auto; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .card h3 {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+    input[type="text"] {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.5rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      width: 100%;
+    }
+    input[type="text"]:focus { outline: none; border-color: var(--accent); }
+    button {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    button:hover { background: var(--accent-hover); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button.secondary {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+    }
+    button.secondary:hover { border-color: var(--text); color: var(--text); }
+    button.danger { background: #c0392b; }
+    button.danger:hover { background: #e74c3c; }
+    .row { display: flex; gap: 0.5rem; align-items: center; }
+    .status {
+      font-size: 0.8rem;
+      padding: 0.25rem 0.5rem;
+      border-radius: 3px;
+      display: inline-block;
+    }
+    .status.connected { background: rgba(46,204,113,0.15); color: var(--green); }
+    .status.disconnected { background: rgba(227,19,55,0.15); color: var(--accent); }
+    .trust-list { list-style: none; }
+    .trust-list li {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .trust-list li:last-child { border-bottom: none; }
+    .trust-account { font-weight: 600; }
+    .empty { color: var(--text-muted); font-size: 0.85rem; font-style: italic; padding: 0.5rem 0; }
+    .tree { margin-top: 0.5rem; }
+    .tree-node {
+      padding: 0.3rem 0;
+      border-left: 2px solid var(--border);
+      padding-left: 1rem;
+      margin-left: 0.5rem;
+    }
+    .tree-node.depth-0 { border-left: none; padding-left: 0; margin-left: 0; }
+    .tree-node .account { font-weight: 600; }
+    .tree-node .attenuation {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-left: 0.5rem;
+    }
+    .tree-node .attenuation.high { color: var(--green); }
+    .tree-node .attenuation.medium { color: var(--yellow); }
+    .tree-node .attenuation.low { color: var(--accent); }
+    .loading { color: var(--text-muted); font-size: 0.85rem; }
+    .error { color: var(--accent); font-size: 0.85rem; margin-top: 0.5rem; }
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      padding: 0.75rem 1.25rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      z-index: 100;
+      animation: fadeIn 0.2s ease;
+    }
+    .toast.success { background: rgba(46,204,113,0.9); color: white; }
+    .toast.error { background: rgba(192,57,43,0.9); color: white; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    #app-login { display: block; }
+    #app-main { display: none; }
+    .header-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+    .header-row .user-info { display: flex; align-items: center; gap: 0.75rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Hive Swarm Post</h1>
+    <p class="subtitle">Trust Declaration Manager</p>
+
+    <!-- Login -->
+    <div id="app-login">
+      <div class="card">
+        <h3>Connect</h3>
+        <div id="keychain-status"></div>
+        <div class="row" style="margin-top: 0.75rem;">
+          <input type="text" id="username-input" placeholder="Hive username (without @)">
+          <button id="login-btn" onclick="login()">Connect</button>
+        </div>
+        <div id="login-error" class="error"></div>
+      </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app-main">
+      <div class="header-row">
+        <div class="user-info">
+          <span>@<strong id="display-username"></strong></span>
+          <span class="status connected">Connected</span>
+        </div>
+        <button class="secondary" onclick="logout()">Disconnect</button>
+      </div>
+
+      <!-- Declare Trust -->
+      <div class="card">
+        <h3>Declare Trust</h3>
+        <div class="row">
+          <input type="text" id="trust-input" placeholder="Onboarder username to trust">
+          <button onclick="declareTrust()">Trust</button>
+        </div>
+        <div id="trust-error" class="error"></div>
+      </div>
+
+      <!-- Your Trusted Accounts -->
+      <div class="card">
+        <h3>Your Trusted Accounts</h3>
+        <div id="trust-loading" class="loading">Loading trust declarations...</div>
+        <ul id="trust-list" class="trust-list"></ul>
+        <div id="trust-empty" class="empty" style="display:none;">No trust declarations yet.</div>
+      </div>
+
+      <!-- Downstream Trust -->
+      <div class="card">
+        <h3>Downstream Trust Tree</h3>
+        <p style="font-size:0.8rem;color:var(--text-muted);margin-bottom:0.75rem;">
+          Shows who your trusted accounts trust, up to 3 degrees deep with attenuation.
+        </p>
+        <div id="downstream-loading" class="loading">Loading downstream trust...</div>
+        <div id="downstream-tree" class="tree"></div>
+        <div id="downstream-empty" class="empty" style="display:none;">No downstream trust to display.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const HIVE_API = 'https://api.hive.blog';
+    const CUSTOM_JSON_ID = 'swarm_trust';
+    const MAX_DEPTH = 3;
+    const ATTENUATION = 0.5;
+
+    let currentUser = null;
+    let trustedAccounts = new Set();
+
+    // --- Hive API ---
+
+    async function hiveCall(method, params) {
+      const res = await fetch(HIVE_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', method, params, id: 1 })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error.message || 'Hive API error');
+      return data.result;
+    }
+
+    async function accountExists(username) {
+      const accounts = await hiveCall('condenser_api.get_accounts', [[username]]);
+      return accounts && accounts.length > 0;
+    }
+
+    async function getTrustDeclarations(username) {
+      const trusted = new Set();
+      let start = -1;
+      let hasMore = true;
+
+      while (hasMore) {
+        const history = await hiveCall('condenser_api.get_account_history', [username, start, 1000, 262144]);
+        if (!history || history.length === 0) break;
+
+        for (const [seq, tx] of history) {
+          const op = tx.op;
+          if (op[0] === 'custom_json' && op[1].id === CUSTOM_JSON_ID) {
+            try {
+              const json = JSON.parse(op[1].json);
+              if (json.trust) trusted.add(json.trust);
+              if (json.revoke) trusted.delete(json.revoke);
+            } catch (e) { /* skip malformed */ }
+          }
+        }
+
+        if (history.length < 1000) {
+          hasMore = false;
+        } else {
+          start = history[0][0] - 1;
+          if (start < 0) hasMore = false;
+        }
+      }
+
+      return trusted;
+    }
+
+    // --- Keychain ---
+
+    function hasKeychain() {
+      return typeof window.hive_keychain !== 'undefined';
+    }
+
+    function broadcastCustomJson(username, payload) {
+      return new Promise((resolve, reject) => {
+        if (!hasKeychain()) return reject(new Error('Hive Keychain not found'));
+        window.hive_keychain.requestCustomJson(
+          username,
+          CUSTOM_JSON_ID,
+          'Posting',
+          JSON.stringify(payload),
+          'Swarm Trust Declaration',
+          (response) => {
+            if (response.success) resolve(response);
+            else reject(new Error(response.message || 'Keychain rejected'));
+          }
+        );
+      });
+    }
+
+    // --- UI ---
+
+    function showToast(message, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    function checkKeychainStatus() {
+      const el = document.getElementById('keychain-status');
+      // Keychain injects asynchronously, retry briefly
+      let attempts = 0;
+      const check = () => {
+        if (hasKeychain()) {
+          el.innerHTML = '<span class="status connected">Hive Keychain detected</span>';
+          document.getElementById('login-btn').disabled = false;
+        } else if (attempts < 10) {
+          attempts++;
+          setTimeout(check, 200);
+        } else {
+          el.innerHTML = '<span class="status disconnected">Hive Keychain not found — please install the extension</span>';
+          document.getElementById('login-btn').disabled = true;
+        }
+      };
+      check();
+    }
+
+    async function login() {
+      const input = document.getElementById('username-input');
+      const errorEl = document.getElementById('login-error');
+      const username = input.value.trim().toLowerCase().replace('@', '');
+      errorEl.textContent = '';
+
+      if (!username) { errorEl.textContent = 'Enter a username'; return; }
+      if (!hasKeychain()) { errorEl.textContent = 'Hive Keychain not detected'; return; }
+
+      try {
+        const exists = await accountExists(username);
+        if (!exists) { errorEl.textContent = `Account @${username} not found`; return; }
+      } catch (e) {
+        errorEl.textContent = 'Failed to verify account: ' + e.message;
+        return;
+      }
+
+      currentUser = username;
+      document.getElementById('display-username').textContent = username;
+      document.getElementById('app-login').style.display = 'none';
+      document.getElementById('app-main').style.display = 'block';
+      await loadTrustData();
+    }
+
+    function logout() {
+      currentUser = null;
+      trustedAccounts.clear();
+      document.getElementById('app-login').style.display = 'block';
+      document.getElementById('app-main').style.display = 'none';
+      document.getElementById('username-input').value = '';
+    }
+
+    async function loadTrustData() {
+      const listEl = document.getElementById('trust-list');
+      const loadingEl = document.getElementById('trust-loading');
+      const emptyEl = document.getElementById('trust-empty');
+      const downLoadingEl = document.getElementById('downstream-loading');
+      const downTreeEl = document.getElementById('downstream-tree');
+      const downEmptyEl = document.getElementById('downstream-empty');
+
+      listEl.innerHTML = '';
+      downTreeEl.innerHTML = '';
+      loadingEl.style.display = 'block';
+      emptyEl.style.display = 'none';
+      downLoadingEl.style.display = 'block';
+      downEmptyEl.style.display = 'none';
+
+      try {
+        trustedAccounts = await getTrustDeclarations(currentUser);
+      } catch (e) {
+        loadingEl.textContent = 'Error loading trust data: ' + e.message;
+        downLoadingEl.style.display = 'none';
+        return;
+      }
+
+      loadingEl.style.display = 'none';
+      renderTrustList();
+
+      // Load downstream
+      try {
+        await renderDownstreamTree();
+      } catch (e) {
+        downLoadingEl.textContent = 'Error loading downstream data: ' + e.message;
+      }
+    }
+
+    function renderTrustList() {
+      const listEl = document.getElementById('trust-list');
+      const emptyEl = document.getElementById('trust-empty');
+      listEl.innerHTML = '';
+
+      if (trustedAccounts.size === 0) {
+        emptyEl.style.display = 'block';
+        return;
+      }
+      emptyEl.style.display = 'none';
+
+      for (const account of [...trustedAccounts].sort()) {
+        const li = document.createElement('li');
+        li.innerHTML = `
+          <span class="trust-account">@${escapeHtml(account)}</span>
+          <button class="danger" onclick="revokeTrust('${escapeHtml(account)}')">Revoke</button>
+        `;
+        listEl.appendChild(li);
+      }
+    }
+
+    async function declareTrust() {
+      const input = document.getElementById('trust-input');
+      const errorEl = document.getElementById('trust-error');
+      const account = input.value.trim().toLowerCase().replace('@', '');
+      errorEl.textContent = '';
+
+      if (!account) { errorEl.textContent = 'Enter a username'; return; }
+      if (account === currentUser) { errorEl.textContent = 'Cannot trust yourself'; return; }
+      if (trustedAccounts.has(account)) { errorEl.textContent = `Already trusting @${account}`; return; }
+
+      try {
+        const exists = await accountExists(account);
+        if (!exists) { errorEl.textContent = `Account @${account} not found`; return; }
+        await broadcastCustomJson(currentUser, { trust: account });
+        trustedAccounts.add(account);
+        input.value = '';
+        renderTrustList();
+        showToast(`Trust declared for @${account}`);
+        renderDownstreamTree();
+      } catch (e) {
+        errorEl.textContent = e.message;
+      }
+    }
+
+    async function revokeTrust(account) {
+      try {
+        await broadcastCustomJson(currentUser, { revoke: account });
+        trustedAccounts.delete(account);
+        renderTrustList();
+        showToast(`Trust revoked for @${account}`);
+        renderDownstreamTree();
+      } catch (e) {
+        showToast(e.message, 'error');
+      }
+    }
+
+    // --- Downstream Trust Tree ---
+
+    const trustCache = new Map();
+
+    async function getDownstreamTrust(username) {
+      if (trustCache.has(username)) return trustCache.get(username);
+      const result = await getTrustDeclarations(username);
+      trustCache.set(username, result);
+      return result;
+    }
+
+    async function renderDownstreamTree() {
+      const treeEl = document.getElementById('downstream-tree');
+      const loadingEl = document.getElementById('downstream-loading');
+      const emptyEl = document.getElementById('downstream-empty');
+
+      treeEl.innerHTML = '';
+      loadingEl.style.display = 'block';
+      emptyEl.style.display = 'none';
+      trustCache.clear();
+
+      if (trustedAccounts.size === 0) {
+        loadingEl.style.display = 'none';
+        emptyEl.style.display = 'block';
+        return;
+      }
+
+      const visited = new Set([currentUser]);
+
+      async function buildTree(accounts, depth, parentEl) {
+        for (const account of [...accounts].sort()) {
+          if (visited.has(account)) continue;
+          visited.add(account);
+
+          const factor = Math.pow(ATTENUATION, depth);
+          const node = document.createElement('div');
+          node.className = `tree-node depth-${depth}`;
+
+          const attClass = factor >= 0.5 ? 'high' : factor >= 0.25 ? 'medium' : 'low';
+          node.innerHTML = `<span class="account">@${escapeHtml(account)}</span><span class="attenuation ${attClass}">${factor.toFixed(2)}x</span>`;
+          parentEl.appendChild(node);
+
+          if (depth < MAX_DEPTH) {
+            try {
+              const downstream = await getDownstreamTrust(account);
+              if (downstream.size > 0) {
+                await buildTree(downstream, depth + 1, node);
+              }
+            } catch (e) {
+              const err = document.createElement('span');
+              err.className = 'error';
+              err.textContent = ` (failed to load)`;
+              node.appendChild(err);
+            }
+          }
+        }
+      }
+
+      await buildTree(trustedAccounts, 0, treeEl);
+      loadingEl.style.display = 'none';
+
+      if (treeEl.children.length === 0) {
+        emptyEl.style.display = 'block';
+      }
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // --- Init ---
+    window.addEventListener('DOMContentLoaded', checkKeychainStatus);
+
+    document.getElementById('username-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') login();
+    });
+
+    document.getElementById('trust-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') declareTrust();
+    });
+  </script>
+</body>
+</html>

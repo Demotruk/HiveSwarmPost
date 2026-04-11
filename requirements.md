@@ -220,11 +220,29 @@ The system is designed so that the most profitable strategy is genuinely onboard
 | Rounds per day | 10 | Number of lottery comments per day |
 | Beneficiaries per round | 8 | Limited by Hive protocol |
 
+## Trust Declaration Web UI
+
+A minimal static web page allows users to manage their trust declarations. No backend is required — the page queries public Hive API nodes directly and uses the Hive Keychain browser extension for signing transactions.
+
+### Features
+
+1. **Connect** — User enters their Hive username. The page verifies the account exists and that Hive Keychain is installed.
+2. **Declare trust** — User inputs an onboarder's username. The page broadcasts a `custom_json` operation: `{"trust": "onboarder_account"}`.
+3. **Revoke trust** — User selects from their trusted accounts list. The page broadcasts: `{"revoke": "onboarder_account"}`.
+4. **View trusted accounts** — Displays all accounts the user currently trusts, derived by replaying their `swarm_trust` `custom_json` history (applying trusts and revocations in order).
+5. **View downstream trust tree** — For each trusted account, recursively shows who they trust (degree 2), who those accounts trust (degree 3), etc., up to the trust depth cap. Each level displays the attenuation factor (1.0x → 0.5x → 0.25x → 0.125x).
+
+### Technical Requirements
+
+- Single static HTML page (no build step, no backend)
+- Queries `condenser_api.get_account_history` on public Hive API nodes to read `custom_json` history
+- Uses Hive Keychain (`window.hive_keychain.requestCustomJson`) for signing with Posting authority
+- Can be hosted on GitHub Pages or any static file host
+
 ## Open Questions
 
 - **Naming the custom_json ID**: `swarm_trust`? `hive_swarm_trust`? Needs to be unique and not conflict with existing operations.
 - **Bot account name**: What account runs the daily posts?
-- **Trust declaration UI**: Is there a web interface for declaring trust, or is it CLI/programmatic only in v1?
 - **Voter window tuning**: 7 days is a starting point. Too short = volatile. Too long = stale trust from inactive voters.
 - **Expiry boost**: Should newbies approaching the end of their eligibility window get a weight multiplier to reduce the chance of never being selected? Deferred to v2.
 - **Governance**: Who controls the bot account? How are parameter changes decided?
