@@ -10,8 +10,8 @@ The system is designed to be sybil-resistant, fully auditable, and trustless. Se
 
 - One root post per day, created by a bot account
 - 10 comments posted throughout the day, each a separate lottery round
-- Each comment has 8 beneficiaries selected from the eligible newbie pool
-- 80 unique newbies funded per day, up to ~2,400 per month
+- Each comment selects 2 newbies, with rewards split between the newbies and their onboarders (see Beneficiary Structure)
+- 20 unique newbies funded per day, up to ~600 per month
 - Supporters upvote the root post and comments, same as burn post supporters do today
 - No pool account, no trusted operator required for distribution
 
@@ -20,8 +20,19 @@ The system is designed to be sybil-resistant, fully auditable, and trustless. Se
 A Hive account is eligible for the Swarm Post lottery when:
 
 - Created within the last 30 days (configurable)
-- Has published at least 1 post or comment (social proof of genuine engagement)
+- Has a qualifying introduction post (see below)
 - Has not already been selected as a beneficiary during their eligibility window (each newbie can only win once)
+
+### Introduction Post Requirements
+
+The newbie must have published an introduction post that meets all of the following criteria:
+
+- Published within the newbie's eligibility window (first 30 days)
+- Contains at least one image (verifiable from `json_metadata.image`)
+- Tagged with `introduceyourself`
+- Has received at least one upvote with positive net weight from web-of-trust participants (i.e., at least one trusted stakeholder has reviewed and approved the post)
+
+This is tool-agnostic — posts from CheckInWithXYZ, PeakD, Ecency, or any other frontend qualify as long as they meet the criteria. The introduction post serves as social proof of humanness: a real photo, a public introduction, and explicit approval from at least one trusted community member.
 
 ## Activity Weighting
 
@@ -41,7 +52,7 @@ Where `cap` = 10 (configurable). This produces:
 | 5 | 0.74 |
 | 10 | 1.00 |
 
-The first post gets nearly a third of max weight. Subsequent posts have diminishing impact. Activity beyond the cap provides no additional benefit, preventing spam-posting as a strategy.
+The introduction post counts toward `post_comment_count`, so every eligible newbie starts with at least 1 and a minimum activity weight of 0.29. Subsequent posts have diminishing impact. Activity beyond the cap provides no additional benefit, preventing spam-posting as a strategy.
 
 ## Web of Trust
 
@@ -148,24 +159,67 @@ For each lottery round (comment):
 seed = SHA256(btc_block_hash + "hive-swarm-post" + date + round_number)
 pool = all eligible newbies not yet selected in their eligibility window
 
-for i in 1..8:
+for i in 1..2:
     weights = [score(n) for n in pool]
     selected = weighted_random(pool, weights, seed, i)
     beneficiaries.append(selected)
     pool.remove(selected)
 ```
 
+The `weighted_random` function works as follows:
+
+```
+function weighted_random(pool, weights, seed, index):
+    random_bytes = SHA256(seed + index_as_bytes)
+    random_value = (first 8 bytes of random_bytes as uint64) / 2^64  # produces [0, 1)
+    total_weight = sum(weights)
+    threshold = random_value * total_weight
+    cumulative = 0
+    for i, w in enumerate(weights):
+        cumulative += w
+        if cumulative > threshold:
+            return pool[i]
+    return pool[last]  # fallback for floating point edge case
+```
+
 The algorithm is deterministic given the inputs. Anyone can independently verify that the correct beneficiaries were selected.
 
-If the eligible pool has fewer than 8 newbies, all remaining eligible newbies are selected and rewards are split equally among them. If the pool is empty (0 eligible), the round is skipped and no comment is posted.
+If the eligible pool has only 1 newbie, that newbie and their onboarder(s) are the sole beneficiaries. If the pool is empty (0 eligible), the round is skipped and no comment is posted.
+
+### Beneficiary Structure
+
+Each comment selects 2 newbies. Rewards are split equally between each newbie and their onboarder(s):
+
+| Beneficiary | Share |
+|---|---|
+| Newbie 1 | 25% |
+| Newbie 1's creator | 12.5% |
+| Newbie 1's referrer | 12.5% |
+| Newbie 2 | 25% |
+| Newbie 2's creator | 12.5% |
+| Newbie 2's referrer | 12.5% |
+
+This produces up to 6 beneficiaries per comment (well within the Hive limit of 8).
+
+If a newbie has no referrer, the creator receives the full onboarder share (25% of total) for that newbie. Similarly, if the creator and referrer are the same account, that account receives the full onboarder share as a single beneficiary entry.
+
+The onboarder reward incentivizes onboarders to support their newbies beyond account creation — helping with retention, encouraging posting activity, and maintaining the quality of their onboards.
 
 ### Daily Schedule
 
 - 10 lottery rounds per day
 - Comments posted at regular intervals (~2.4 hours apart, configurable)
-- Each round removes its 8 winners from the pool for the remainder of their eligibility window
+- Each round removes its 2 winners from the pool for the remainder of their eligibility window
 
 ## Post Structure
+
+### Permlink and Tag Conventions
+
+- **Root post permlink**: `swarm-post-YYYY-MM-DD` (e.g., `swarm-post-2026-04-11`)
+- **Comment permlinks**: `swarm-post-YYYY-MM-DD-round-N` (e.g., `swarm-post-2026-04-11-round-3`)
+- **Primary tag**: `hive-swarm-post`
+- **Additional tags**: `swarmpost`, `onboarding`, `newbies`
+- **Post metadata**: `json_metadata.app` = `"swarmpost/1.0.0"`
 
 ### Root Post (1 per day)
 
@@ -180,7 +234,7 @@ The root post is the Schelling point for voter support. It contains:
 
 Each comment is a lottery round. It contains:
 
-- The 8 selected beneficiaries (set via `comment_options`)
+- The selected beneficiaries — up to 6: 2 newbies + their onboarders (set via `comment_options`)
 - For each beneficiary: their onboarder(s), trust path, score breakdown
 - The Bitcoin block hash used as the randomness seed
 - Enough information for anyone to independently verify the selection
@@ -191,13 +245,13 @@ The system has multiple layers of sybil defense:
 
 1. **Stake-weighted trust**: Trust declarations carry weight proportional to HP. Creating sybil accounts doesn't generate trust — you need real stakeholders to trust you.
 
-2. **Activity requirement**: Newbies must post or comment (social proof). Sybil accounts that don't produce content get zero weight.
+2. **Introduction post with trusted approval**: Each newbie must publish an introduction post with a photo and the `introduceyourself` tag, and at least one trusted stakeholder must upvote it. This means a real person in the trust network has reviewed the introduction and judged it legitimate.
 
 3. **Diminishing activity returns**: Spam-posting provides minimal additional benefit beyond the first few posts.
 
 4. **Trust revocation**: If an onboarder starts sybiling, the community can revoke trust via `custom_json`. The effect is immediate in the next trust graph computation.
 
-5. **Onboarder dilution**: An onboarder's trust score is shared across all their newbies. Creating more sybil accounts dilutes the per-account reward, while the effort per sybil (must post content) stays constant.
+5. **Onboarder dilution**: An onboarder's trust score is shared across all their newbies. Creating more sybil accounts dilutes the per-account reward, while the effort per sybil (must produce a convincing introduction) stays constant.
 
 6. **Verifiable lottery**: The Bitcoin block hash makes selection auditable. Any manipulation of the eligible pool or scoring is publicly detectable.
 
@@ -205,11 +259,23 @@ The system has multiple layers of sybil defense:
 
 To profit from sybil attacks, an attacker needs:
 - Stake (HP) to generate meaningful trust, or social capital to get staked accounts to trust them — **expensive**
-- Each sybil account must post at least once — **effort per account**
-- Trust is revocable if detected — **risk of losing investment**
-- Per-sybil reward is small (share of one comment's rewards, split 8 ways) — **low return**
+- Each sybil account must publish a convincing introduction post with a photo — **effort per account**
+- At least one trusted stakeholder must approve each introduction — **social gate**
+- Trust is revocable if detected — **risk of losing all trust**
+- Per-sybil reward is small (share of one comment's rewards, split between 2 newbies and their onboarders) — **low return**
 
 The system is designed so that the most profitable strategy is genuinely onboarding active users.
+
+## Deployment
+
+The bot runs as a scheduled job on Fly.io, executing hourly. Each run:
+
+1. Checks if a root post for today exists; if not, creates one
+2. Determines how many lottery rounds should have been posted by now (based on the 10-round daily schedule)
+3. Posts any pending lottery comments with their beneficiaries
+4. Exits until the next scheduled run
+
+The bot requires the `@swarmpost` account's posting key for broadcasting posts and comments. The key is stored as a Fly.io secret, never in the repository.
 
 ## Hive Blockchain Constraints
 
@@ -223,13 +289,15 @@ The system is designed so that the most profitable strategy is genuinely onboard
 | Parameter | Default | Description |
 |---|---|---|
 | Eligibility window | 30 days | How long after account creation a newbie is eligible |
-| Activity threshold | 1 post/comment | Minimum to enter the pool |
+| Activity threshold | 1 intro post | Minimum to enter the pool (must meet introduction post requirements) |
 | Activity cap | 10 posts/comments | Point of maximum activity weight |
 | Trust attenuation | 0.5 per hop | How much trust decays per degree of indirection |
 | Trust depth cap | 4 hops | Maximum trust path length |
 | Voter window | 7 days | Rolling window for counting active voters as trust roots |
 | Rounds per day | 10 | Number of lottery comments per day |
-| Beneficiaries per round | 8 | Limited by Hive protocol |
+| Newbies per round | 2 | Selected per comment; up to 6 beneficiaries with onboarders |
+| Newbie reward share | 50% | Per-newbie slot share going to the newbie |
+| Onboarder reward share | 50% | Per-newbie slot share split between creator and referrer |
 
 ## Trust Declaration Web UI
 
@@ -252,7 +320,6 @@ A minimal static web page allows users to manage their trust declarations. No ba
 
 ## Open Questions
 
-- **Bot account name**: `@swarmpost`
 - **Voter window tuning**: 7 days is a starting point. Too short = volatile. Too long = stale trust from inactive voters.
 - **Expiry boost**: Should newbies approaching the end of their eligibility window get a weight multiplier to reduce the chance of never being selected? Deferred to v2.
 - **Governance**: Who controls the bot account? How are parameter changes decided?
