@@ -49,7 +49,7 @@ The first post gets nearly a third of max weight. Subsequent posts have diminish
 
 Any Hive account can declare trust in an onboarder via `custom_json` operations:
 
-- **Operation ID**: `swarm_trust` (or similar, TBD)
+- **Operation ID**: `swarm_trust`
 - **Trust**: `{"trust": "onboarder_account"}`
 - **Revoke**: `{"revoke": "onboarder_account"}`
 
@@ -90,6 +90,12 @@ Only accounts that voted on the Swarm Post (root post or comments) within the la
 - The 7-day rolling window smooths out daily voter turnout variance
 - The trust graph updates daily as voters come and go
 
+### Bootstrapping
+
+During the bootstrap period (before 7 days of voting history exist), the voter requirement is relaxed: any account that has broadcast a `swarm_trust` custom_json operation is treated as a trust root, weighted by their HP. This allows trust declarations made before launch to take effect immediately.
+
+Once 7 days of Swarm Post voting history have accumulated, the system transitions to the normal model where only voters are trust roots. The transition is automatic — no manual intervention required.
+
 ## Onboarder Attribution
 
 Each new Hive account has up to two trust sources, derived from on-chain data:
@@ -97,9 +103,11 @@ Each new Hive account has up to two trust sources, derived from on-chain data:
 | Field | Source | Example (Propolis) |
 |---|---|---|
 | **Creator** | Account that signed the `account_create` operation | Issuer |
-| **Referrer** | Referral metadata set at account creation | Distributor |
+| **Referrer** | Entry with `"label": "referrer"` in the account's `json_metadata.beneficiaries` array (per the [HiveOnBoard open standard](https://hive.blog/hive/@hiveonboard/open-standard-for-a-hive-account-referral-system)) | Distributor |
 
-If both exist, the newbie's score draws from both trust paths:
+The `json_metadata.beneficiaries` array may also contain entries with labels `"creator"` and `"provider"`. Only the `"referrer"` entry is used for trust attribution; the on-chain `account_create` signer is used as the creator regardless of what appears in metadata.
+
+If both creator and referrer exist, the newbie's score draws from both trust paths:
 
 ```
 onboarder_trust = trust_score(creator) + trust_score(referrer)
@@ -107,7 +115,7 @@ onboarder_trust = trust_score(creator) + trust_score(referrer)
 
 If only a creator exists, full weight goes through the creator's trust score.
 
-This maps naturally to systems like Propolis (issuer = creator, distributor = referrer) and any other onboarding tool that sets these fields.
+This maps naturally to systems like Propolis (issuer = creator, distributor = referrer) and any other onboarding tool that follows the HiveOnBoard referral standard.
 
 ## Newbie Scoring
 
@@ -125,11 +133,12 @@ Where:
 
 ### Randomness Source
 
-Each lottery round uses the hash of the most recent Bitcoin block at time of posting as the randomness seed. This provides:
+Each lottery round uses a Bitcoin block hash as its randomness seed. The first comment uses the most recent Bitcoin block hash at time of posting. Each subsequent comment uses the block at offset -1 from the previous (i.e., comment 2 uses `latest - 1`, comment 3 uses `latest - 2`, etc.), ensuring each round has a distinct seed. This provides:
 
 - **Unpredictability**: No Hive actor can influence Bitcoin mining
 - **Verifiability**: Anyone can check the block hash and reproduce the selection
 - **Public availability**: No oracle or trusted third party needed
+- **Uniqueness**: Each comment in the daily post uses a different block hash
 
 ### Selection Algorithm
 
@@ -147,6 +156,8 @@ for i in 1..8:
 ```
 
 The algorithm is deterministic given the inputs. Anyone can independently verify that the correct beneficiaries were selected.
+
+If the eligible pool has fewer than 8 newbies, all remaining eligible newbies are selected and rewards are split equally among them. If the pool is empty (0 eligible), the round is skipped and no comment is posted.
 
 ### Daily Schedule
 
@@ -241,8 +252,7 @@ A minimal static web page allows users to manage their trust declarations. No ba
 
 ## Open Questions
 
-- **Naming the custom_json ID**: `swarm_trust`? `hive_swarm_trust`? Needs to be unique and not conflict with existing operations.
-- **Bot account name**: What account runs the daily posts?
+- **Bot account name**: `@swarmpost`
 - **Voter window tuning**: 7 days is a starting point. Too short = volatile. Too long = stale trust from inactive voters.
 - **Expiry boost**: Should newbies approaching the end of their eligibility window get a weight multiplier to reduce the chance of never being selected? Deferred to v2.
 - **Governance**: Who controls the bot account? How are parameter changes decided?
