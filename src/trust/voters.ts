@@ -2,6 +2,7 @@ import { getClient, withRetry } from '../hive/client.js';
 import { getAccounts, getAccountHP } from '../hive/accounts.js';
 import { postExists, getActiveVotes } from '../hive/posts.js';
 import { getTrustDeclarations } from '../hive/trust.js';
+import { fetchAllDeclarers } from '../hive/trustApi.js';
 import type { VoterInfo, Config } from '../types.js';
 
 /**
@@ -67,27 +68,25 @@ async function collectRecentVoters(config: Config, date: string): Promise<Set<st
 
 /**
  * Bootstrap mode: use all trust-declaring accounts as roots.
- * Scan the bot account's followers and known community accounts
- * for swarm_trust declarations.
+ * Queries the swarm-trust-api backend which indexes all swarm_trust
+ * custom_json operations from the blockchain.
+ *
+ * Falls back to crawling from the bot account's own declarations
+ * if the API is unreachable.
  */
 async function getBootstrapRoots(config: Config): Promise<VoterInfo[]> {
-  // In bootstrap mode, we look at accounts that have trust declarations
-  // Since we can't efficiently scan all of Hive for custom_json,
-  // we check the bot account's own trust declarations as a seed,
-  // then check who trusts the accounts the bot trusts.
-  const botTrusted = await getTrustDeclarations(config.botAccount);
-  const allDeclarers = new Set<string>([config.botAccount, ...botTrusted]);
+  let declarers: string[];
 
-  // Also check if any of the trusted accounts have their own declarations
-  for (const account of botTrusted) {
-    const theirTrusted = await getTrustDeclarations(account);
-    for (const t of theirTrusted) {
-      allDeclarers.add(t);
-    }
+  try {
+    declarers = await fetchAllDeclarers(config.trustApiUrl);
+    console.log(`Bootstrap mode: ${declarers.length} trust declarers from API`);
+  } catch (err) {
+    console.log(`Trust API unavailable (${err}), falling back to on-chain crawl`);
+    const botTrusted = await getTrustDeclarations(config.botAccount);
+    declarers = [config.botAccount, ...botTrusted];
   }
 
-  console.log(`Bootstrap mode: ${allDeclarers.size} trust-declaring accounts found`);
-  return getVoterInfoBatch(Array.from(allDeclarers));
+  return getVoterInfoBatch(declarers);
 }
 
 /**

@@ -9,6 +9,7 @@ export interface Config {
   voterWindowDays: number;
   roundsPerDay: number;
   newbiesPerRound: number;
+  trustApiUrl: string;
   dryRun: boolean;
 }
 
