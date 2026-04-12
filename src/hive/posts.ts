@@ -5,11 +5,16 @@ import type { BeneficiaryEntry } from '../types.js';
  * Check if a post/comment exists on chain by its author and permlink.
  */
 export async function postExists(author: string, permlink: string): Promise<boolean> {
-  const content = await withRetry(() =>
-    getClient().database.call('get_content', [author, permlink])
-  );
-  // get_content returns an object with empty author if post doesn't exist
-  return content && content.author !== '';
+  try {
+    const content = await withRetry(() =>
+      getClient().database.call('get_content', [author, permlink])
+    );
+    // get_content returns an object with empty author if post doesn't exist
+    return content && content.author !== '';
+  } catch {
+    // Some nodes throw for non-existent posts instead of returning empty
+    return false;
+  }
 }
 
 /**

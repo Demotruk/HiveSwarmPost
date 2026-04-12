@@ -35,11 +35,17 @@ export async function getTrustDeclarations(username: string): Promise<Set<string
   const batchSize = 1000;
 
   while (true) {
-    const history = await withRetry<any[][]>(() =>
-      hiveCall<any[][]>('condenser_api', 'get_account_history', [
-        username, start, batchSize, CUSTOM_JSON_BITMASK,
-      ])
-    );
+    let history: any[][];
+    try {
+      history = await withRetry<any[][]>(() =>
+        hiveCall<any[][]>('condenser_api', 'get_account_history', [
+          username, start, batchSize, CUSTOM_JSON_BITMASK,
+        ])
+      );
+    } catch {
+      // Account may not exist or have no matching history
+      break;
+    }
 
     if (!history || history.length === 0) break;
 

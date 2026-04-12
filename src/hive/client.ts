@@ -9,7 +9,9 @@ export function initClient(config: Config): void {
     timeout: 10000,
     failoverThreshold: 3,
   });
-  privateKey = PrivateKey.fromString(config.postingKey);
+  if (config.postingKey) {
+    privateKey = PrivateKey.fromString(config.postingKey);
+  }
 }
 
 export function getClient(): Client {
