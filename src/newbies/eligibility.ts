@@ -9,7 +9,7 @@ import type { Config, EligibleNewbie, IntroPostStatus, TrustGraph } from '../typ
  *
  * A newbie is eligible when:
  * 1. Account created within the eligibility window
- * 2. Has a qualifying introduction post (image, introduceyourself tag, trusted upvote)
+ * 2. Has a qualifying introduction post (image, introduceyourself tag, net positive trust participant votes)
  * 3. Not already selected as a beneficiary in current eligibility window
  */
 export async function buildEligiblePool(
@@ -139,10 +139,14 @@ export async function findIntroPostWithStatus(
 
     if (!hasIntroTag || !hasImage) continue;
 
-    // Check for trusted upvotes
+    // Check for net positive voting weight from trust participants
     const votes = await getActiveVotes(post.author, post.permlink);
-    const trustedVoters = votes
-      .filter((v: any) => trustParticipants.has(v.voter) && (v.rshares > 0 || v.percent > 0))
+    const trustedVotes = votes.filter((v: any) => trustParticipants.has(v.voter));
+    const netTrustedRshares = trustedVotes.reduce(
+      (sum: number, v: any) => sum + (Number(v.rshares) || 0), 0,
+    );
+    const trustedVoters = trustedVotes
+      .filter((v: any) => v.rshares > 0 || v.percent > 0)
       .map((v: any) => v.voter);
 
     return {
@@ -154,7 +158,7 @@ export async function findIntroPostWithStatus(
       url: `https://peakd.com/@${post.author}/${post.permlink}`,
       hasImage,
       hasIntroTag,
-      hasTrustedVote: trustedVoters.length > 0,
+      hasTrustedVote: netTrustedRshares > 0,
       trustedVoters,
     };
   }
@@ -166,7 +170,7 @@ export async function findIntroPostWithStatus(
  * Check if a newbie has a qualifying introduction post:
  * - Tagged with "introduceyourself"
  * - Contains at least one image in json_metadata.image
- * - Has at least one upvote with positive weight from a trust participant
+ * - Has net positive rshares from web-of-trust participants (sum of all trust participant votes > 0)
  */
 async function hasQualifyingIntroPost(
   username: string,
