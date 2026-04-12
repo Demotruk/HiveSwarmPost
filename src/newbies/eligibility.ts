@@ -201,19 +201,27 @@ export async function findNewbiesCreatedBy(
 
     if (!history || history.length === 0) break;
 
+    let reachedBeforeWindow = false;
     for (const [, entry] of history) {
+      const timestamp = new Date(entry.timestamp + 'Z');
+
+      // History is scanned newest-first; stop once we're before the window
+      if (timestamp < windowStart) {
+        reachedBeforeWindow = true;
+        break;
+      }
+
       const [opType, opData] = entry.op;
       if (
         (opType === 'account_create' || opType === 'create_claimed_account') &&
-        opData.creator === creator
+        opData.creator === creator &&
+        timestamp <= windowEnd
       ) {
-        const timestamp = new Date(entry.timestamp + 'Z');
-        if (timestamp >= windowStart && timestamp <= windowEnd) {
-          newbies.push(opData.new_account_name);
-        }
+        newbies.push(opData.new_account_name);
       }
     }
 
+    if (reachedBeforeWindow) break;
     if (history.length < batchSize) break;
     start = history[0][0] - 1;
     if (start < 0) break;

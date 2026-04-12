@@ -6,9 +6,7 @@ import type { BeneficiaryEntry } from '../types.js';
  */
 export async function postExists(author: string, permlink: string): Promise<boolean> {
   try {
-    const content = await withRetry(() =>
-      getClient().database.call('get_content', [author, permlink])
-    );
+    const content = await getClient().database.call('get_content', [author, permlink]);
     // get_content returns an object with empty author if post doesn't exist
     return content && content.author !== '';
   } catch {
