@@ -44,7 +44,7 @@ export function loadConfig(opts?: { requireKeys?: boolean }): Config {
     trustDepthCap: intEnv('TRUST_DEPTH_CAP', 4),
     voterWindowDays: intEnv('VOTER_WINDOW_DAYS', 7),
     roundsPerDay: intEnv('ROUNDS_PER_DAY', 10),
-    newbiesPerRound: intEnv('NEWBIES_PER_ROUND', 2),
+    newbiesPerRound: intEnv('NEWBIES_PER_ROUND', 1),
     trustApiUrl: env('TRUST_API_URL', 'https://swarm-trust-api.fly.dev'),
     dryRun: boolEnv('DRY_RUN', false),
   };

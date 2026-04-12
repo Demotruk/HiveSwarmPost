@@ -27,7 +27,7 @@ export function rootPostBody(
   body += `## How It Works\n\n`;
   body += `- 10 lottery rounds at fixed times: 00:00, 02:24, 04:48, 07:12, 09:36, 12:00, 14:24, 16:48, 19:12, 21:36 UTC\n`;
   body += `- **Round 1 is this post.** Rounds 2\u201310 are posted as comments below.\n`;
-  body += `- Each round selects 2 newbies as beneficiaries alongside their onboarders\n`;
+  body += `- Each round selects 1 newbie as beneficiary alongside their onboarder(s)\n`;
   body += `- Selection is weighted by onboarder trust and newbie activity\n`;
   body += `- Randomness sourced from the Bitcoin block at each round's **scheduled** time (not posting time)\n`;
   body += `- This means the operator cannot influence outcomes by delaying a post\n`;
