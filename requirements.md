@@ -30,7 +30,7 @@ The newbie must have published an introduction post that meets all of the follow
 - Published within the newbie's eligibility window (first 30 days)
 - Contains at least one image (verifiable from `json_metadata.image`)
 - Tagged with `introduceyourself`
-- Has received at least one upvote with positive net weight from web-of-trust participants (i.e., at least one trusted stakeholder has reviewed and approved the post)
+- Has net positive `rshares` from web-of-trust participants (i.e., the sum of all votes cast by accounts in the trust graph must be > 0)
 
 This is tool-agnostic — posts from CheckInWithXYZ, PeakD, Ecency, or any other frontend qualify as long as they meet the criteria. The introduction post serves as social proof of humanness: a real photo, a public introduction, and explicit approval from at least one trusted community member.
 
@@ -142,14 +142,38 @@ Where:
 
 ## Lottery Selection
 
+### Timing Schedule
+
+The 10 lottery rounds per day are posted at fixed, evenly-spaced times (UTC):
+
+| Round | Scheduled Time (UTC) |
+|---|---|
+| 1 | 00:00 |
+| 2 | 02:24 |
+| 3 | 04:48 |
+| 4 | 07:12 |
+| 5 | 09:36 |
+| 6 | 12:00 |
+| 7 | 14:24 |
+| 8 | 16:48 |
+| 9 | 19:12 |
+| 10 | 21:36 |
+
+These scheduled times are part of the protocol and are published in the daily root post. The bot runs hourly and posts any rounds whose scheduled time has passed.
+
 ### Randomness Source
 
-Each lottery round uses a Bitcoin block hash as its randomness seed. The first comment uses the most recent Bitcoin block hash at time of posting. Each subsequent comment uses the block at offset -1 from the previous (i.e., comment 2 uses `latest - 1`, comment 3 uses `latest - 2`, etc.), ensuring each round has a distinct seed. This provides:
+Each lottery round uses a Bitcoin block hash as its randomness seed. The block used is the **most recent Bitcoin block at or before the round's scheduled time** — not the actual time the comment is posted. This is a critical anti-gaming property: the controller cannot influence the lottery outcome by delaying a post, because the block is already determined by the published schedule.
+
+For example, if round 3 is scheduled at 04:48 UTC, the block used is whichever BTC block was most recently mined at 04:48 UTC, regardless of whether the bot actually posts at 04:48, 05:00, or 06:00. Anyone can verify this by looking up Bitcoin blocks at the scheduled timestamp.
+
+This provides:
 
 - **Unpredictability**: No Hive actor can influence Bitcoin mining
-- **Verifiability**: Anyone can check the block hash and reproduce the selection
+- **Verifiability**: Anyone can check the block hash at the scheduled timestamp and reproduce the selection
 - **Public availability**: No oracle or trusted third party needed
-- **Uniqueness**: Each comment in the daily post uses a different block hash
+- **Uniqueness**: Each round has a different scheduled time, so each uses a different block
+- **Timing neutrality**: The controller gains no advantage from delaying posts
 
 ### Selection Algorithm
 
@@ -207,9 +231,10 @@ The onboarder reward incentivizes onboarders to support their newbies beyond acc
 
 ### Daily Schedule
 
-- 10 lottery rounds per day
-- Comments posted at regular intervals (~2.4 hours apart, configurable)
+- 10 lottery rounds per day at the times listed in the Timing Schedule above
+- The bot runs hourly and posts any rounds whose scheduled time has passed
 - Each round removes its 2 winners from the pool for the remainder of their eligibility window
+- The Bitcoin block for each round is locked to the scheduled time, not the actual posting time
 
 ## Post Structure
 
@@ -245,7 +270,7 @@ The system has multiple layers of sybil defense:
 
 1. **Stake-weighted trust**: Trust declarations carry weight proportional to HP. Creating sybil accounts doesn't generate trust — you need real stakeholders to trust you.
 
-2. **Introduction post with trusted approval**: Each newbie must publish an introduction post with a photo and the `introduceyourself` tag, and at least one trusted stakeholder must upvote it. This means a real person in the trust network has reviewed the introduction and judged it legitimate.
+2. **Introduction post with trusted approval**: Each newbie must publish an introduction post with a photo and the `introduceyourself` tag, and the net `rshares` from web-of-trust participants must be positive. This means the trust network as a whole has reviewed and approved the introduction — a single downvote from a trusted member can override upvotes from others.
 
 3. **Diminishing activity returns**: Spam-posting provides minimal additional benefit beyond the first few posts.
 

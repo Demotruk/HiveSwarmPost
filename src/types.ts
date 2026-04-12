@@ -40,7 +40,9 @@ export interface SelectedNewbie {
 export interface LotteryRound {
   roundNumber: number;
   date: string;
+  scheduledTimestamp: number; // UNIX seconds — the round's expected post time
   btcBlockHash: string;
+  btcBlockHeight: number;
   seed: string;
   selected: SelectedNewbie[];
   beneficiaries: BeneficiaryEntry[];

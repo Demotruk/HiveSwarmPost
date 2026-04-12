@@ -5,12 +5,12 @@ import { getVoterRoots } from './trust/voters.js';
 import { computeTrustScores } from './trust/graph.js';
 import { buildEligiblePool } from './newbies/eligibility.js';
 import { rankPool } from './newbies/scoring.js';
-import { getLatestBtcBlock, getBtcBlockHashForRound } from './lottery/bitcoin.js';
+import { getBtcBlockAtTimestamp } from './lottery/bitcoin.js';
 import { computeSeed, selectFromPool } from './lottery/selection.js';
 import { buildBeneficiaries } from './lottery/beneficiaries.js';
 import { ensureRootPost } from './posting/root.js';
 import { postLotteryComment } from './posting/comments.js';
-import { getPendingRounds, currentMinuteOfDayUTC, todayUTC } from './scheduler.js';
+import { getPendingRounds, currentMinuteOfDayUTC, todayUTC, getScheduledTimestamp } from './scheduler.js';
 import { postExists } from './hive/posts.js';
 import type { LotteryRound, SelectedNewbie } from './types.js';
 
@@ -114,18 +114,23 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Fetch Bitcoin block data
-  console.log('Fetching Bitcoin block data...');
-  const btcBlock = await getLatestBtcBlock();
-  console.log(`Latest BTC block: height=${btcBlock.height}, hash=${btcBlock.hash.slice(0, 16)}...`);
-
   // Track already-selected newbies across rounds in this run
   const selectedThisRun = new Set<string>();
 
   for (const roundNumber of pendingRounds) {
-    // Get block hash for this round
-    const btcBlockHash = await getBtcBlockHashForRound(roundNumber, btcBlock.height);
-    const seed = computeSeed(btcBlockHash, date, roundNumber);
+    // Use the round's *scheduled* time to determine the Bitcoin block,
+    // not the current time. This prevents the controller from delaying
+    // a post to change the lottery outcome.
+    const scheduledTs = getScheduledTimestamp(date, roundNumber, config.roundsPerDay);
+    console.log(
+      `Round ${roundNumber}: scheduled ${new Date(scheduledTs * 1000).toISOString()}, fetching BTC block...`
+    );
+    const btcBlock = await getBtcBlockAtTimestamp(scheduledTs);
+    console.log(
+      `Round ${roundNumber}: BTC block height=${btcBlock.height}, hash=${btcBlock.hash.slice(0, 16)}...`
+    );
+
+    const seed = computeSeed(btcBlock.hash, date, roundNumber);
 
     // Filter pool to exclude already-selected
     const availablePool = rankedPool.filter(n => !selectedThisRun.has(n.account));
@@ -155,7 +160,9 @@ async function main(): Promise<void> {
     const round: LotteryRound = {
       roundNumber,
       date,
-      btcBlockHash,
+      scheduledTimestamp: scheduledTs,
+      btcBlockHash: btcBlock.hash,
+      btcBlockHeight: btcBlock.height,
       seed,
       selected,
       beneficiaries,

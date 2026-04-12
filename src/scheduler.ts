@@ -48,6 +48,24 @@ export function currentMinuteOfDayUTC(): number {
 }
 
 /**
+ * Get the scheduled UTC timestamp (seconds since epoch) for a given round.
+ *
+ * Each round has a fixed scheduled time determined by the daily schedule.
+ * This is the time used for Bitcoin block selection, NOT the actual posting
+ * time — preventing the controller from delaying a post to change the winner.
+ */
+export function getScheduledTimestamp(
+  date: string,
+  roundNumber: number,
+  roundsPerDay: number,
+): number {
+  const schedule = getRoundSchedule(roundsPerDay);
+  const minuteOfDay = schedule[roundNumber - 1];
+  const dateMs = new Date(date + 'T00:00:00Z').getTime();
+  return Math.floor(dateMs / 1000) + minuteOfDay * 60;
+}
+
+/**
  * Get today's date string in YYYY-MM-DD format (UTC).
  */
 export function todayUTC(): string {

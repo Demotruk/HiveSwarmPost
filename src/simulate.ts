@@ -10,7 +10,7 @@ import { activityWeight } from './newbies/activity.js';
 import { rankPool } from './newbies/scoring.js';
 import { computeSeed, selectFromPool } from './lottery/selection.js';
 import { buildBeneficiaries } from './lottery/beneficiaries.js';
-import { getPendingRounds } from './scheduler.js';
+import { getPendingRounds, getScheduledTimestamp } from './scheduler.js';
 import { rootPostBody, roundCommentBody } from './posting/templates.js';
 import type { TrustGraph, VoterInfo, EligibleNewbie, SelectedNewbie, LotteryRound } from './types.js';
 
@@ -19,6 +19,7 @@ const ROUNDS_PER_DAY = 10;
 const NEWBIES_PER_ROUND = 2;
 const DATE = new Date().toISOString().slice(0, 10);
 const FAKE_BTC_HASH = '0000000000000000000232a3fe8b6c8d4f0e7c5a9b1d3e5f7a9b1c3d5e7f9a1b';
+const FAKE_BTC_HEIGHT = 840000;
 
 // --- Fixture data ---
 
@@ -151,10 +152,14 @@ function simulate(): void {
 
     const beneficiaries = buildBeneficiaries(selected);
 
+    const scheduledTs = getScheduledTimestamp(DATE, roundNumber, ROUNDS_PER_DAY);
+
     const round: LotteryRound = {
       roundNumber,
       date: DATE,
+      scheduledTimestamp: scheduledTs,
       btcBlockHash,
+      btcBlockHeight: FAKE_BTC_HEIGHT + roundNumber,
       seed,
       selected,
       beneficiaries,

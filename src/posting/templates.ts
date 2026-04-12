@@ -24,10 +24,11 @@ export function rootPostBody(
   body += `| Trust declarations | ${trustDeclarations} |\n\n`;
 
   body += `## How It Works\n\n`;
-  body += `- 10 lottery rounds throughout the day, each selecting 2 newbies\n`;
-  body += `- Newbies and their onboarders receive rewards as beneficiaries\n`;
+  body += `- 10 lottery rounds at fixed times: 00:00, 02:24, 04:48, 07:12, 09:36, 12:00, 14:24, 16:48, 19:12, 21:36 UTC\n`;
+  body += `- Each round selects 2 newbies as beneficiaries alongside their onboarders\n`;
   body += `- Selection is weighted by onboarder trust and newbie activity\n`;
-  body += `- Randomness sourced from Bitcoin block hashes (verifiable)\n`;
+  body += `- Randomness sourced from the Bitcoin block at each round's **scheduled** time (not posting time)\n`;
+  body += `- This means the operator cannot influence outcomes by delaying a post\n`;
   body += `- [Full documentation](https://github.com/user/hive-swarm-post)\n\n`;
 
   body += `## Support\n\n`;
@@ -80,11 +81,17 @@ export function roundCommentBody(round: LotteryRound): string {
   }
   body += `\n`;
 
+  const scheduledTime = new Date(round.scheduledTimestamp * 1000).toISOString();
+
   body += `### Verification\n\n`;
-  body += `- Bitcoin block hash: \`${round.btcBlockHash}\`\n`;
+  body += `- Scheduled time: \`${scheduledTime}\`\n`;
+  body += `- Bitcoin block: height \`${round.btcBlockHeight}\`, hash \`${round.btcBlockHash}\`\n`;
+  body += `- Block selection rule: latest BTC block at or before the scheduled time\n`;
   body += `- Seed: \`SHA256("${round.btcBlockHash}hive-swarm-post${round.date}${round.roundNumber}")\`\n`;
   body += `- Result: \`${round.seed}\`\n\n`;
-  body += `Anyone can independently verify this selection by running the algorithm with the above inputs.\n`;
+  body += `The block used for randomness is determined by the round's scheduled time, not the actual posting time. `;
+  body += `This prevents the operator from influencing the outcome by delaying the post. `;
+  body += `Anyone can independently verify this selection by looking up the BTC block at the scheduled timestamp.\n`;
 
   return body;
 }
