@@ -132,3 +132,58 @@ export async function broadcastCommentWithBeneficiaries(
     getClient().broadcast.sendOperations(operations, getPrivateKey())
   );
 }
+
+/**
+ * Broadcast a root post with beneficiaries (atomic: comment + comment_options).
+ */
+export async function broadcastPostWithBeneficiaries(
+  author: string,
+  permlink: string,
+  title: string,
+  body: string,
+  tags: string[],
+  appMetadata: string,
+  beneficiaries: BeneficiaryEntry[],
+): Promise<void> {
+  const jsonMetadata = JSON.stringify({
+    tags,
+    app: appMetadata,
+  });
+
+  const sortedBeneficiaries = [...beneficiaries].sort((a, b) =>
+    a.account.localeCompare(b.account)
+  );
+
+  const operations: any[] = [
+    [
+      'comment',
+      {
+        parent_author: '',
+        parent_permlink: tags[0],
+        author,
+        permlink,
+        title,
+        body,
+        json_metadata: jsonMetadata,
+      },
+    ],
+    [
+      'comment_options',
+      {
+        author,
+        permlink,
+        max_accepted_payout: '1000000.000 HBD',
+        percent_hbd: 10000,
+        allow_votes: true,
+        allow_curation_rewards: true,
+        extensions: [
+          [0, { beneficiaries: sortedBeneficiaries }],
+        ],
+      },
+    ],
+  ];
+
+  await withRetry(() =>
+    getClient().broadcast.sendOperations(operations, getPrivateKey())
+  );
+}
