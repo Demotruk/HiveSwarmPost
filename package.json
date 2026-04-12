@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "simulate": "tsx src/simulate.ts",
+    "feed": "tsx src/feed.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

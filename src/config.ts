@@ -28,9 +28,10 @@ function boolEnv(name: string, defaultValue: boolean): boolean {
   return value === 'true' || value === '1';
 }
 
-export function loadConfig(): Config {
+export function loadConfig(opts?: { requireKeys?: boolean }): Config {
+  const requireKeys = opts?.requireKeys ?? true;
   return {
-    postingKey: requireEnv('POSTING_KEY'),
+    postingKey: requireKeys ? requireEnv('POSTING_KEY') : env('POSTING_KEY', ''),
     botAccount: env('BOT_ACCOUNT', 'swarmpost'),
     hiveNodes: [
       'https://api.hive.blog',

@@ -2,7 +2,7 @@ import { getAccounts, getAccountCreatedDate, getOnboarderAttribution, getPostCom
 import { hiveCall, withRetry } from '../hive/client.js';
 import { postExists, getActiveVotes } from '../hive/posts.js';
 import { activityWeight } from './activity.js';
-import type { Config, EligibleNewbie, TrustGraph } from '../types.js';
+import type { Config, EligibleNewbie, IntroPostStatus, TrustGraph } from '../types.js';
 
 /**
  * Build the pool of eligible newbies for the lottery.
@@ -101,6 +101,68 @@ async function evaluateNewbie(
 }
 
 /**
+ * Find a newbie's best introduction post and return detailed status.
+ * Returns null if no introduceyourself post with an image exists.
+ *
+ * Unlike hasQualifyingIntroPost, this returns the post data and
+ * per-criterion breakdown regardless of whether all criteria are met.
+ */
+export async function findIntroPostWithStatus(
+  username: string,
+  trustParticipants: Set<string>,
+): Promise<IntroPostStatus | null> {
+  const posts = await withRetry<any[]>(() =>
+    hiveCall<any[]>('condenser_api', 'get_discussions_by_blog', [{
+      tag: username,
+      limit: 50,
+    }])
+  );
+
+  if (!posts || posts.length === 0) return null;
+
+  for (const post of posts) {
+    if (post.author !== username || post.parent_author !== '') continue;
+
+    let tags: string[] = [];
+    let images: string[] = [];
+    try {
+      const meta = JSON.parse(post.json_metadata);
+      tags = meta.tags || [];
+      images = meta.image || meta.images || [];
+      if (!Array.isArray(images)) images = [];
+    } catch {
+      continue;
+    }
+
+    const hasIntroTag = tags.includes('introduceyourself');
+    const hasImage = images.length > 0;
+
+    if (!hasIntroTag || !hasImage) continue;
+
+    // Check for trusted upvotes
+    const votes = await getActiveVotes(post.author, post.permlink);
+    const trustedVoters = votes
+      .filter((v: any) => trustParticipants.has(v.voter) && (v.rshares > 0 || v.percent > 0))
+      .map((v: any) => v.voter);
+
+    return {
+      author: post.author,
+      permlink: post.permlink,
+      title: post.title,
+      created: post.created,
+      images,
+      url: `https://peakd.com/@${post.author}/${post.permlink}`,
+      hasImage,
+      hasIntroTag,
+      hasTrustedVote: trustedVoters.length > 0,
+      trustedVoters,
+    };
+  }
+
+  return null;
+}
+
+/**
  * Check if a newbie has a qualifying introduction post:
  * - Tagged with "introduceyourself"
  * - Contains at least one image in json_metadata.image
@@ -110,51 +172,14 @@ async function hasQualifyingIntroPost(
   username: string,
   trustParticipants: Set<string>,
 ): Promise<boolean> {
-  // Get the user's posts tagged with introduceyourself
-  const posts = await withRetry<any[]>(() =>
-    hiveCall<any[]>('condenser_api', 'get_discussions_by_blog', [{
-      tag: username,
-      limit: 50,
-    }])
-  );
-
-  if (!posts || posts.length === 0) return false;
-
-  for (const post of posts) {
-    // Must be a root post by this author
-    if (post.author !== username || post.parent_author !== '') continue;
-
-    // Check tags
-    let tags: string[] = [];
-    try {
-      const meta = JSON.parse(post.json_metadata);
-      tags = meta.tags || [];
-
-      // Check for image
-      const images = meta.image || meta.images || [];
-      if (!Array.isArray(images) || images.length === 0) continue;
-    } catch {
-      continue;
-    }
-
-    if (!tags.includes('introduceyourself')) continue;
-
-    // Check for trusted upvote
-    const votes = await getActiveVotes(post.author, post.permlink);
-    const hasTrustedVote = votes.some(
-      (v: any) => trustParticipants.has(v.voter) && (v.rshares > 0 || v.percent > 0)
-    );
-
-    if (hasTrustedVote) return true;
-  }
-
-  return false;
+  const status = await findIntroPostWithStatus(username, trustParticipants);
+  return status !== null && status.hasTrustedVote;
 }
 
 /**
  * Find accounts created by a specific onboarder within the eligibility window.
  */
-async function findNewbiesCreatedBy(
+export async function findNewbiesCreatedBy(
   creator: string,
   windowStart: Date,
   windowEnd: Date,

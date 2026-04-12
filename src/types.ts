@@ -46,6 +46,29 @@ export interface LotteryRound {
   beneficiaries: BeneficiaryEntry[];
 }
 
+export interface IntroPostStatus {
+  author: string;
+  permlink: string;
+  title: string;
+  created: string;
+  images: string[];
+  url: string;
+  hasImage: boolean;
+  hasIntroTag: boolean;
+  hasTrustedVote: boolean;
+  trustedVoters: string[];
+}
+
+export interface FeedNewbie {
+  account: string;
+  createdAt: Date;
+  onboarders: OnboarderAttribution;
+  activityWeight: number;
+  onboarderTrust: number;
+  score: number;
+  introPost: IntroPostStatus;
+}
+
 /** Adjacency list: account -> Set of accounts they trust */
 export type TrustGraph = Map<string, Set<string>>;
 
