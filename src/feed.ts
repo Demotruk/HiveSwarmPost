@@ -59,6 +59,7 @@ async function buildFeed(): Promise<FeedNewbie[]> {
   }
 
   const trustScores = computeTrustScores(graph, voters, config.trustAttenuation, config.trustDepthCap);
+  console.log(`Trust scores computed for ${trustScores.size} onboarders`);
 
   const trustParticipants = new Set<string>();
   for (const v of voters) trustParticipants.add(v.account);
@@ -66,9 +67,11 @@ async function buildFeed(): Promise<FeedNewbie[]> {
   for (const [, trusted] of graph) {
     for (const t of trusted) trustParticipants.add(t);
   }
+  console.log(`Trust participants: ${trustParticipants.size}`);
 
   // Build feed pool (includes newbies without trusted votes)
   const onboarderAccounts = Array.from(trustScores.keys());
+  console.log(`Scanning ${onboarderAccounts.length} onboarders for newbies: ${onboarderAccounts.join(', ')}`);
   const feed = await buildFeedPool(onboarderAccounts, trustScores, trustParticipants, config, date);
 
   console.log(`Feed built: ${feed.length} newbie intro posts (${feed.filter(n => n.introPost.hasTrustedVote).length} eligible)`);

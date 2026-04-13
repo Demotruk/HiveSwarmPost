@@ -114,7 +114,7 @@ export async function findIntroPostWithStatus(
   const posts = await withRetry<any[]>(() =>
     hiveCall<any[]>('condenser_api', 'get_discussions_by_blog', [{
       tag: username,
-      limit: 50,
+      limit: 20,
     }])
   );
 

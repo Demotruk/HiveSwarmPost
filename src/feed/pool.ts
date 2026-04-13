@@ -26,7 +26,9 @@ export async function buildFeedPool(
     const creatorScore = trustScores.get(onboarder) || 0;
     if (creatorScore === 0) continue;
 
+    console.log(`  Scanning @${onboarder} for created accounts...`);
     const newbies = await findNewbiesCreatedBy(onboarder, windowStart, now);
+    console.log(`  @${onboarder}: ${newbies.length} newbies found`);
 
     for (const newbieAccount of newbies) {
       try {
