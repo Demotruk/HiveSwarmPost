@@ -57,7 +57,7 @@ export function feedPageHtml(): string {
     }
     el.innerHTML = data.map(n => {
       const img = n.introPost.images[0] || '';
-      const eligible = n.introPost.hasTrustedVote;
+      const eligible = n.introPost.hasTrustedVote && n.introPost.isOldEnough;
       const date = new Date(n.introPost.created + 'Z').toLocaleDateString();
       const voters = n.introPost.trustedVoters.length > 0
         ? 'Trusted votes: ' + n.introPost.trustedVoters.map(v => '@' + v).join(', ')
@@ -71,7 +71,7 @@ export function feedPageHtml(): string {
         + (n.onboarders.referrer ? ' (ref: @' + esc(n.onboarders.referrer) + ')' : '')
         + '</div>'
         + '<span class="badge ' + (eligible ? 'eligible' : 'awaiting') + '">'
-        + (eligible ? 'Eligible' : 'Awaiting trust vote')
+        + (eligible ? 'Eligible' : !n.introPost.isOldEnough ? 'Too new (&lt;24h)' : 'Awaiting trust vote')
         + '</span>'
         + '<div class="details">'
         + 'Trust score: ' + n.onboarderTrust.toFixed(0)

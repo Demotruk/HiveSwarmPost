@@ -139,6 +139,10 @@ export async function findIntroPostWithStatus(
 
     if (!hasIntroTag || !hasImage) continue;
 
+    // Post must be at least 24 hours old so the community has time to validate
+    const postAge = Date.now() - new Date(post.created + 'Z').getTime();
+    const isOldEnough = postAge >= 24 * 60 * 60 * 1000;
+
     // Check for net positive voting weight from trust participants
     const votes = await getActiveVotes(post.author, post.permlink);
     const trustedVotes = votes.filter((v: any) => trustParticipants.has(v.voter));
@@ -159,6 +163,7 @@ export async function findIntroPostWithStatus(
       hasImage,
       hasIntroTag,
       hasTrustedVote: netTrustedRshares > 0,
+      isOldEnough,
       trustedVoters,
     };
   }
@@ -177,7 +182,7 @@ async function hasQualifyingIntroPost(
   trustParticipants: Set<string>,
 ): Promise<boolean> {
   const status = await findIntroPostWithStatus(username, trustParticipants);
-  return status !== null && status.hasTrustedVote;
+  return status !== null && status.hasTrustedVote && status.isOldEnough;
 }
 
 /**

@@ -59,6 +59,7 @@ export interface IntroPostStatus {
   hasImage: boolean;
   hasIntroTag: boolean;
   hasTrustedVote: boolean;
+  isOldEnough: boolean;
   trustedVoters: string[];
 }
 

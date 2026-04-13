@@ -42,14 +42,13 @@ export async function buildFeedPool(
     }
   }
 
-  // Sort: eligible (hasTrustedVote) first by score desc, then ineligible by creation date desc
+  // Sort: fully eligible first by score desc, then ineligible by creation date desc
+  const isEligible = (n: FeedNewbie) => n.introPost.hasTrustedVote && n.introPost.isOldEnough;
   feedNewbies.sort((a, b) => {
-    if (a.introPost.hasTrustedVote !== b.introPost.hasTrustedVote) {
-      return a.introPost.hasTrustedVote ? -1 : 1;
-    }
-    if (a.introPost.hasTrustedVote) {
-      return b.score - a.score;
-    }
+    const aElig = isEligible(a);
+    const bElig = isEligible(b);
+    if (aElig !== bElig) return aElig ? -1 : 1;
+    if (aElig) return b.score - a.score;
     return new Date(b.introPost.created).getTime() - new Date(a.introPost.created).getTime();
   });
 
