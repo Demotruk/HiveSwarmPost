@@ -47,5 +47,6 @@ export function loadConfig(opts?: { requireKeys?: boolean }): Config {
     newbiesPerRound: intEnv('NEWBIES_PER_ROUND', 1),
     trustApiUrl: env('TRUST_API_URL', 'https://swarm-trust-api.fly.dev'),
     dryRun: boolEnv('DRY_RUN', false),
+    syncFollows: boolEnv('SYNC_FOLLOWS', false),
   };
 }

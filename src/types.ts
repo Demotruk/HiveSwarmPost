@@ -11,6 +11,7 @@ export interface Config {
   newbiesPerRound: number;
   trustApiUrl: string;
   dryRun: boolean;
+  syncFollows: boolean;
 }
 
 export interface OnboarderAttribution {

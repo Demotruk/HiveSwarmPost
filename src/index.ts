@@ -12,6 +12,7 @@ import { ensureRootPost } from './posting/root.js';
 import { postLotteryComment } from './posting/comments.js';
 import { getPendingRounds, currentMinuteOfDayUTC, todayUTC, getScheduledTimestamp } from './scheduler.js';
 import { postExists } from './hive/posts.js';
+import { getFollowing, syncFollows } from './hive/follows.js';
 import type { Config, EligibleNewbie, LotteryRound, SelectedNewbie } from './types.js';
 
 async function main(): Promise<void> {
@@ -90,11 +91,22 @@ async function main(): Promise<void> {
   const rankedPool = rankPool(pool);
   console.log(`Eligible pool: ${rankedPool.length} newbies`);
 
-  // 5. Run round 1 selection and create root post (root post IS round 1)
+  // 5. Sync follow list with eligible pool
+  if (config.syncFollows) {
+    console.log('Syncing follow list...');
+    const desiredFollows = rankedPool.map(n => n.account);
+    const currentFollows = await getFollowing(config.botAccount);
+    console.log(`Current follows: ${currentFollows.length}, desired: ${desiredFollows.length}`);
+    const result = await syncFollows(desiredFollows, currentFollows, config.botAccount, config.dryRun);
+    console.log(`Follow sync complete: +${result.followed.length} -${result.unfollowed.length}`);
+  }
+
+  // 6. Run round 1 selection and create root post (root post IS round 1)
   const trustDeclarationCount = Array.from(graph.values())
     .reduce((sum, set) => sum + set.size, 0);
 
   // Track already-selected newbies across rounds in this run
+
   const selectedThisRun = new Set<string>();
   let round1: LotteryRound | null = null;
 
@@ -120,7 +132,7 @@ async function main(): Promise<void> {
     );
   }
 
-  // 6. Run remaining lottery rounds (2+)
+  // 7. Run remaining lottery rounds (2+)
   if (rankedPool.length === 0) {
     console.log('No eligible newbies. Skipping lottery rounds.');
     return;
