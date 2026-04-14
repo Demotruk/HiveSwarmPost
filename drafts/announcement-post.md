@@ -1,16 +1,12 @@
 # The Hive Swarm Post
 
-![swarm-post-header](IMAGE_PLACEHOLDER)
+![swarm-post-header](https://files.peakd.com/file/peakd-hive/demotruk/23vhMrK7JCfo54PqqJ198PXNbcmd9kT3LJiCSLNk6P8F2KX6aE9LspF4tqNeSehAGEqZa.png)
 
-You know the burn post. Vote on it, rewards go to `@null`, supply shrinks.
-
-**The Swarm Post works the same way — but instead of burning, it grows.**
-
-Vote on the Swarm Post, and your rewards go directly to newly onboarded Hive users and the people who brought them here. No middleman, no pool account, no committee deciding who gets what. Just the blockchain and a trust-weighted lottery.
+This post allocates beneficiary rewards to a randomly pre-selected new hiver and the accounts that onboarded them.
 
 ## How It Works
 
-Every day, the `@hiveswarm` bot publishes a root post and 10 comments throughout the day. Each is a lottery round that selects 1 newbie from the eligible pool. Rewards are split between the newbie and their onboarder(s):
+Every day, the `@swarmpost` bot publishes a root post and up to 10 comments throughout the day. Each is a lottery round that selects 1 newbie from the eligible pool. Rewards are split between the newbie and their onboarder(s):
 
 | Recipient | Share |
 |-----------|-------|
@@ -32,7 +28,7 @@ The more active and well-connected the newbie, the better their chances. But eve
 
 ## The Trust Layer
 
-Selection is powered by the [web of trust](https://hiveinvite.com/trust/) that many of you have already been building. If you've declared trust in onboarders on HiveInvite, that trust now has teeth.
+Selection is powered by the [web of trust](https://hiveinvite.com/trust/). If you've declared trust in onboarders on HiveInvite, you have already influenced the selection of who became beneficiary for this post, and you can influence how this is allocated going forward.
 
 Here's how it flows:
 
@@ -41,6 +37,8 @@ Here's how it flows:
 3. **Trust propagates through degrees** — if you trust Alice and Alice trusts Bob, Bob's newbies benefit from your support, but at reduced weight
 
 Only voters' trust declarations are active. Voting on the Swarm Post is saying: *"I endorse this system and want my trust to count."*
+
+**Vouching strengthens the signal.** If you're in the web of trust and you come across an `introduceyourself` post, your upvote is a vouch — its weight is your HP, propagated through the trust graph. The Swarm Post works better when those vouches reflect real social proof: a selfie with the onboarder, a geotagged checkin, a photo with real-world context. If that kind of evidence is there, upvote with confidence. If it isn't, your restraint is part of the mechanism too.
 
 ## Why Onboarders Get Paid Too
 
@@ -71,7 +69,7 @@ No trusted operator. No hidden RNG. Just math and public data.
 ## How to Participate
 
 **As a voter/stakeholder:**
-1. Vote on the daily `@hiveswarm` post — that's all it takes to fund newbie onboarding
+1. Vote on the daily `@swarmpost` post — that's all it takes to fund newbie onboarding
 2. [Declare trust](https://hiveinvite.com/trust/) in onboarders you believe in — your trust shapes who gets funded
 
 **As an onboarder:**
