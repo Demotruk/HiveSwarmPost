@@ -3,7 +3,9 @@ import { rootPostBody } from './templates.js';
 import { onChainBeneficiaries } from './beneficiariesTestMode.js';
 import type { Config, LotteryRound } from '../types.js';
 
-const TAGS = ['hive-swarm-post', 'swarmpost', 'onboarding', 'newbies'];
+// First tag sets the Hive community/category. hive-107705 is the
+// HiveInvite.com community where production Swarm Post entries belong.
+const TAGS = ['hive-107705', 'hive-swarm-post', 'swarmpost', 'onboarding', 'newbies'];
 const TEST_TAGS = ['test', 'swarmpost-test'];
 const APP_METADATA = 'swarmpost/1.0.0';
 
