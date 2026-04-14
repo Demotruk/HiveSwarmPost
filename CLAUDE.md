@@ -46,7 +46,9 @@ npm run test:watch   # Watch mode
 
 ## Configuration
 
-Via `.env` (see `.env.example`). Key vars: `POSTING_KEY`, `BOT_ACCOUNT`, `DRY_RUN`, `TRUST_API_URL`, `SYNC_FOLLOWS`, `ROUNDS_PER_DAY`, `NEWBIES_PER_ROUND`.
+Via `.env` (see `.env.example`). Key vars: `POSTING_KEY`, `BOT_ACCOUNT`, `DRY_RUN`, `TEST_MODE`, `TRUST_API_URL`, `SYNC_FOLLOWS`, `ROUNDS_PER_DAY`, `NEWBIES_PER_ROUND`.
+
+- **`TEST_MODE=true`**: Posts with "DO NOT UPVOTE" warnings, broken `@mentions` (zero-width space prevents notifications), obscured descriptions, test-specific permlinks (`swarm-test-*`) and tags (`test`, `swarmpost-test`). On-chain beneficiaries are rewritten to a single `@null` entry (see `src/posting/beneficiariesTestMode.ts`) so the `comment_options` op doesn't notify real users — the body text still shows the would-be split for test inspection. Use with the `@swarmpost-test` account.
 
 ## Detailed Spec
 

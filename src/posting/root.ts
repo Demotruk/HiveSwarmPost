@@ -1,8 +1,10 @@
 import { postExists, broadcastPost, broadcastPostWithBeneficiaries } from '../hive/posts.js';
 import { rootPostBody } from './templates.js';
+import { onChainBeneficiaries } from './beneficiariesTestMode.js';
 import type { Config, LotteryRound } from '../types.js';
 
 const TAGS = ['hive-swarm-post', 'swarmpost', 'onboarding', 'newbies'];
+const TEST_TAGS = ['test', 'swarmpost-test'];
 const APP_METADATA = 'swarmpost/1.0.0';
 
 /**
@@ -20,7 +22,9 @@ export async function ensureRootPost(
   previousResults: LotteryRound[] | null,
   round1: LotteryRound | null,
 ): Promise<boolean> {
-  const permlink = `swarm-post-${date}`;
+  const permlink = config.testMode
+    ? `swarm-test-${date}`
+    : `swarm-post-${date}`;
 
   const exists = await postExists(config.botAccount, permlink);
   if (exists) {
@@ -28,10 +32,16 @@ export async function ensureRootPost(
     return false;
   }
 
-  const title = `Hive Swarm Post — ${date}`;
+  const title = config.testMode
+    ? `⚠️ TEST — DO NOT UPVOTE ⚠️ — ${date}`
+    : `Hive Swarm Post — ${date}`;
+
   const body = rootPostBody(
-    date, poolSize, onboarderCount, activeVoters, trustDeclarations, previousResults, round1,
+    date, poolSize, onboarderCount, activeVoters, trustDeclarations,
+    previousResults, round1, config.testMode,
   );
+
+  const tags = config.testMode ? TEST_TAGS : TAGS;
 
   if (config.dryRun) {
     console.log(`[DRY RUN] Would create root post: ${permlink}`);
@@ -44,11 +54,12 @@ export async function ensureRootPost(
 
   console.log(`Creating root post: ${permlink}`);
   if (round1 && round1.beneficiaries.length > 0) {
+    const benForChain = onChainBeneficiaries(round1.beneficiaries, config.testMode);
     await broadcastPostWithBeneficiaries(
-      config.botAccount, permlink, title, body, TAGS, APP_METADATA, round1.beneficiaries,
+      config.botAccount, permlink, title, body, tags, APP_METADATA, benForChain,
     );
   } else {
-    await broadcastPost(config.botAccount, permlink, title, body, TAGS, APP_METADATA);
+    await broadcastPost(config.botAccount, permlink, title, body, tags, APP_METADATA);
   }
   console.log(`Root post created: ${permlink}`);
   return true;

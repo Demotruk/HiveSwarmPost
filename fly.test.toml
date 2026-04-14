@@ -1,0 +1,19 @@
+app = "hive-swarm-post-test"
+primary_region = "iad"
+
+[build]
+
+[env]
+  BOT_ACCOUNT = "testingnewuser"
+  TEST_MODE = "true"
+
+# No HTTP service — this is a scheduled job
+# Runs hourly via Fly Machines scheduled start
+
+[[machines]]
+  auto_destroy = true
+
+  [machines.guest]
+    cpu_kind = "shared"
+    cpus = 1
+    memory_mb = 256

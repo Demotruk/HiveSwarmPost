@@ -12,6 +12,7 @@ export interface Config {
   trustApiUrl: string;
   dryRun: boolean;
   syncFollows: boolean;
+  testMode: boolean;
 }
 
 export interface OnboarderAttribution {

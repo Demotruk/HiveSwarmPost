@@ -4,13 +4,23 @@ import { postExists, getActiveVotes } from '../hive/posts.js';
 import { activityWeight } from './activity.js';
 import type { Config, EligibleNewbie, IntroPostStatus, TrustGraph } from '../types.js';
 
+// Server-side operation filter for get_account_history: only return
+// account_create (op 9) and create_claimed_account (op 23) ops.
+// Without this filter, the API returns every op type (votes, comments,
+// transfers, etc.) and we discard 99%+ client-side.
+const ACCOUNT_CREATE_BITMASK = (1 << 9) | (1 << 23);
+
 /**
  * Build the pool of eligible newbies for the lottery.
  *
- * A newbie is eligible when:
- * 1. Account created within the eligibility window
- * 2. Has a qualifying introduction post (image, introduceyourself tag, net positive trust participant votes)
- * 3. Not already selected as a beneficiary in current eligibility window
+ * Returns two pools:
+ * - `followable`: any account created by a trusted onboarder within the
+ *   eligibility window. Used for follow sync — deliberately liberal so the
+ *   bot follows brand-new accounts before they've made an intro post.
+ * - `eligible`: subset of followable that also passes the lottery criteria
+ *   (has a qualifying intro post: image, `introduceyourself` tag, net
+ *   positive trust-participant votes, >= 24h old) and hasn't already been
+ *   selected as a beneficiary in the current window.
  */
 export async function buildEligiblePool(
   onboarderAccounts: string[],
@@ -18,23 +28,35 @@ export async function buildEligiblePool(
   trustParticipants: Set<string>,
   config: Config,
   date: string,
-): Promise<EligibleNewbie[]> {
+): Promise<{ eligible: EligibleNewbie[]; followable: string[] }> {
   const eligibleNewbies: EligibleNewbie[] = [];
+  const followable = new Set<string>();
   const now = new Date(date + 'T00:00:00Z');
   const windowStart = new Date(now);
   windowStart.setUTCDate(windowStart.getUTCDate() - config.eligibilityWindowDays);
+  const t0 = Date.now();
 
   // Get already-selected newbies (beneficiaries of past Swarm Post comments)
   const alreadySelected = await getAlreadySelectedNewbies(config, date);
+  console.log(`Already-selected newbies (past ${config.eligibilityWindowDays}d): ${alreadySelected.size}`);
+
+  const scoredOnboarders = onboarderAccounts.filter(o => (trustScores.get(o) || 0) > 0);
+  console.log(`Scanning ${scoredOnboarders.length} onboarders for newbies...`);
 
   // For each onboarder with a trust score, find their created accounts
-  for (const onboarder of onboarderAccounts) {
-    const creatorScore = trustScores.get(onboarder) || 0;
-    if (creatorScore === 0) continue;
-
+  let onboarderIdx = 0;
+  for (const onboarder of scoredOnboarders) {
+    onboarderIdx++;
     const newbies = await findNewbiesCreatedBy(onboarder, windowStart, now);
+    if (newbies.length > 0) {
+      console.log(`  [${onboarderIdx}/${scoredOnboarders.length}] @${onboarder}: ${newbies.length} newbies to evaluate`);
+    }
 
     for (const newbieAccount of newbies) {
+      // Every trusted-onboarder-created account in window is followable,
+      // regardless of lottery eligibility.
+      followable.add(newbieAccount);
+
       if (alreadySelected.has(newbieAccount)) continue;
 
       try {
@@ -50,7 +72,11 @@ export async function buildEligiblePool(
     }
   }
 
-  return eligibleNewbies;
+  const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+  console.log(
+    `Pool built in ${elapsed}s: ${eligibleNewbies.length} eligible, ${followable.size} followable`
+  );
+  return { eligible: eligibleNewbies, followable: [...followable] };
 }
 
 /**
@@ -200,33 +226,34 @@ export async function findNewbiesCreatedBy(
   while (true) {
     const history = await withRetry<any[][]>(() =>
       hiveCall<any[][]>('condenser_api', 'get_account_history', [
-        creator, start, batchSize,
+        creator, start, batchSize, ACCOUNT_CREATE_BITMASK,
       ])
     );
 
     if (!history || history.length === 0) break;
 
-    let reachedBeforeWindow = false;
+    // Process ALL entries in the batch. The op-type filter makes entries
+    // sparse in time, so we can't break inside the loop on an "old" entry
+    // without risk of skipping newer-in-window entries later in the batch.
+    let oldestInBatch: Date | null = null;
     for (const [, entry] of history) {
       const timestamp = new Date(entry.timestamp + 'Z');
+      if (!oldestInBatch || timestamp < oldestInBatch) oldestInBatch = timestamp;
 
-      // History is scanned newest-first; stop once we're before the window
-      if (timestamp < windowStart) {
-        reachedBeforeWindow = true;
-        break;
-      }
+      if (timestamp < windowStart || timestamp > windowEnd) continue;
 
       const [opType, opData] = entry.op;
       if (
         (opType === 'account_create' || opType === 'create_claimed_account') &&
-        opData.creator === creator &&
-        timestamp <= windowEnd
+        opData.creator === creator
       ) {
         newbies.push(opData.new_account_name);
       }
     }
 
-    if (reachedBeforeWindow) break;
+    // Stop paginating once we've crossed past the window — nothing older
+    // can be in-window.
+    if (oldestInBatch && oldestInBatch < windowStart) break;
     if (history.length < batchSize) break;
     start = history[0][0] - 1;
     if (start < 0) break;

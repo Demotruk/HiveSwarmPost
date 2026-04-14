@@ -1,6 +1,6 @@
 import { loadConfig } from './config.js';
 import { initClient } from './hive/client.js';
-import { buildTrustGraph } from './hive/trust.js';
+import { fetchTrustGraph } from './hive/trustApi.js';
 import { getVoterRoots } from './trust/voters.js';
 import { computeTrustScores } from './trust/graph.js';
 import { buildEligiblePool } from './newbies/eligibility.js';
@@ -24,6 +24,7 @@ async function main(): Promise<void> {
   initClient(config);
   console.log(`Bot account: @${config.botAccount}`);
   console.log(`Dry run: ${config.dryRun}`);
+  if (config.testMode) console.log(`⚠️  TEST MODE — posts will be marked as test`);
 
   const date = todayUTC();
   console.log(`Date: ${date}`);
@@ -42,9 +43,10 @@ async function main(): Promise<void> {
   }
 
   // 3. Build trust graph
-  console.log('Building trust graph...');
+  console.log('Fetching voter roots...');
+  const votersStart = Date.now();
   const voters = await getVoterRoots(config, date);
-  console.log(`Trust roots: ${voters.length} voters`);
+  console.log(`Trust roots: ${voters.length} voters (${((Date.now() - votersStart) / 1000).toFixed(1)}s)`);
 
   if (voters.length === 0) {
     console.log('No trust roots found. Cannot run lottery.');
@@ -53,22 +55,15 @@ async function main(): Promise<void> {
     return;
   }
 
-  // Get all accounts in the trust network
-  const allTrustAccounts = new Set<string>();
-  for (const v of voters) allTrustAccounts.add(v.account);
-
-  // Build trust graph from voter accounts and their declared trustees
-  const graph = await buildTrustGraph(Array.from(allTrustAccounts));
-
-  // Expand: also load trust declarations for accounts trusted by voters
-  const trustedByVoters = new Set<string>();
-  for (const [, trusted] of graph) {
-    for (const t of trusted) trustedByVoters.add(t);
-  }
-  const expandedGraph = await buildTrustGraph(Array.from(trustedByVoters));
-  for (const [account, trusted] of expandedGraph) {
-    if (!graph.has(account)) graph.set(account, trusted);
-  }
+  // Fetch the full trust graph from swarm-trust-api. The API indexer keeps
+  // this up to date within seconds of chain finality, so we don't need to
+  // crawl account history from the bot.
+  const graphStart = Date.now();
+  const { graph, edgeCount, lastIndexedBlock } = await fetchTrustGraph(config.trustApiUrl);
+  console.log(
+    `Trust graph: ${edgeCount} edges from ${graph.size} declarers ` +
+    `(last indexed block ${lastIndexedBlock}, ${((Date.now() - graphStart) / 1000).toFixed(1)}s)`
+  );
 
   // Compute trust scores
   const trustScores = computeTrustScores(graph, voters, config.trustAttenuation, config.trustDepthCap);
@@ -85,19 +80,21 @@ async function main(): Promise<void> {
   // 4. Build eligible newbie pool
   console.log('Building eligible newbie pool...');
   const onboarderAccounts = Array.from(trustScores.keys());
-  const pool = await buildEligiblePool(
+  const { eligible, followable } = await buildEligiblePool(
     onboarderAccounts, trustScores, trustParticipants, config, date,
   );
-  const rankedPool = rankPool(pool);
-  console.log(`Eligible pool: ${rankedPool.length} newbies`);
+  const rankedPool = rankPool(eligible);
+  console.log(`Ranked pool: ${rankedPool.length} newbies`);
 
-  // 5. Sync follow list with eligible pool
+  // 5. Sync follow list with the followable pool.
+  // Follow criteria are deliberately more liberal than lottery criteria —
+  // we want to follow brand-new accounts before they've made an intro post,
+  // so the bot sees their activity early.
   if (config.syncFollows) {
     console.log('Syncing follow list...');
-    const desiredFollows = rankedPool.map(n => n.account);
     const currentFollows = await getFollowing(config.botAccount);
-    console.log(`Current follows: ${currentFollows.length}, desired: ${desiredFollows.length}`);
-    const result = await syncFollows(desiredFollows, currentFollows, config.botAccount, config.dryRun);
+    console.log(`Current follows: ${currentFollows.length}, desired: ${followable.length}`);
+    const result = await syncFollows(followable, currentFollows, config.botAccount, config.dryRun);
     console.log(`Follow sync complete: +${result.followed.length} -${result.unfollowed.length}`);
   }
 

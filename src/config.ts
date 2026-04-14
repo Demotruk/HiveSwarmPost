@@ -48,5 +48,6 @@ export function loadConfig(opts?: { requireKeys?: boolean }): Config {
     trustApiUrl: env('TRUST_API_URL', 'https://swarm-trust-api.fly.dev'),
     dryRun: boolEnv('DRY_RUN', false),
     syncFollows: boolEnv('SYNC_FOLLOWS', false),
+    testMode: boolEnv('TEST_MODE', false),
   };
 }

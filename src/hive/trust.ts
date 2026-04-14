@@ -5,6 +5,13 @@ const CUSTOM_JSON_ID = 'swarm_trust';
 const CUSTOM_JSON_BITMASK = 262144; // filters to custom_json ops only
 
 /**
+ * Earliest possible timestamp for a swarm_trust custom_json op.
+ * Used to bound backward pagination through account history — no need to
+ * scan ops older than this, since swarm_trust didn't exist yet.
+ */
+const SWARM_TRUST_EPOCH = new Date('2026-04-10T00:00:00Z');
+
+/**
  * Build the trust graph by reading all swarm_trust custom_json operations
  * from a set of accounts.
  *
@@ -12,14 +19,22 @@ const CUSTOM_JSON_BITMASK = 262144; // filters to custom_json ops only
  */
 export async function buildTrustGraph(accounts: string[]): Promise<TrustGraph> {
   const graph: TrustGraph = new Map();
+  const t0 = Date.now();
 
-  for (const account of accounts) {
+  console.log(`Building trust graph for ${accounts.length} accounts...`);
+  for (let i = 0; i < accounts.length; i++) {
+    const account = accounts[i];
+    const accountStart = Date.now();
     const trusted = await getTrustDeclarations(account);
+    const elapsed = ((Date.now() - accountStart) / 1000).toFixed(1);
+    console.log(`  [${i + 1}/${accounts.length}] @${account}: ${trusted.size} trustees (${elapsed}s)`);
     if (trusted.size > 0) {
       graph.set(account, trusted);
     }
   }
 
+  const totalElapsed = ((Date.now() - t0) / 1000).toFixed(1);
+  console.log(`Trust graph built in ${totalElapsed}s`);
   return graph;
 }
 
@@ -33,6 +48,7 @@ export async function getTrustDeclarations(username: string): Promise<Set<string
   const trusted = new Set<string>();
   let start = -1;
   const batchSize = 1000;
+  let batchCount = 0;
 
   while (true) {
     let history: any[][];
@@ -45,10 +61,18 @@ export async function getTrustDeclarations(username: string): Promise<Set<string
       // the bitmask filter causes "Invalid parameters" when no ops match
       break;
     }
+    batchCount++;
+    if (batchCount % 5 === 0) {
+      console.log(`    @${username}: ${batchCount} batches scanned, still paginating...`);
+    }
 
     if (!history || history.length === 0) break;
 
+    let oldestInBatch: Date | null = null;
     for (const [, entry] of history) {
+      const timestamp = new Date(entry.timestamp + 'Z');
+      if (!oldestInBatch || timestamp < oldestInBatch) oldestInBatch = timestamp;
+
       const [opType, opData] = entry.op;
       if (opType !== 'custom_json' || opData.id !== CUSTOM_JSON_ID) continue;
 
@@ -63,6 +87,10 @@ export async function getTrustDeclarations(username: string): Promise<Set<string
         // Invalid JSON, skip
       }
     }
+
+    // Stop paginating once we've scanned past the swarm_trust epoch —
+    // no swarm_trust ops can exist before it.
+    if (oldestInBatch && oldestInBatch < SWARM_TRUST_EPOCH) break;
 
     if (history.length < batchSize) break;
     start = history[0][0] - 1;

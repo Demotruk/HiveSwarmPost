@@ -1,8 +1,10 @@
 import { postExists, broadcastCommentWithBeneficiaries } from '../hive/posts.js';
 import { roundCommentBody } from './templates.js';
+import { onChainBeneficiaries } from './beneficiariesTestMode.js';
 import type { Config, LotteryRound } from '../types.js';
 
 const TAGS = ['hive-swarm-post', 'swarmpost', 'onboarding', 'newbies'];
+const TEST_TAGS = ['test', 'swarmpost-test'];
 const APP_METADATA = 'swarmpost/1.0.0';
 
 /**
@@ -13,8 +15,9 @@ export async function postLotteryComment(
   config: Config,
   round: LotteryRound,
 ): Promise<boolean> {
-  const rootPermlink = `swarm-post-${round.date}`;
-  const commentPermlink = `swarm-post-${round.date}-round-${round.roundNumber}`;
+  const prefix = config.testMode ? 'swarm-test' : 'swarm-post';
+  const rootPermlink = `${prefix}-${round.date}`;
+  const commentPermlink = `${prefix}-${round.date}-round-${round.roundNumber}`;
 
   const exists = await postExists(config.botAccount, commentPermlink);
   if (exists) {
@@ -22,7 +25,7 @@ export async function postLotteryComment(
     return false;
   }
 
-  const body = roundCommentBody(round);
+  const body = roundCommentBody(round, config.testMode);
 
   if (config.dryRun) {
     console.log(`[DRY RUN] Would post round ${round.roundNumber}: ${commentPermlink}`);
@@ -30,6 +33,9 @@ export async function postLotteryComment(
     return false;
   }
 
+  const tags = config.testMode ? TEST_TAGS : TAGS;
+
+  const benForChain = onChainBeneficiaries(round.beneficiaries, config.testMode);
   console.log(`Posting round ${round.roundNumber}: ${commentPermlink}`);
   await broadcastCommentWithBeneficiaries(
     config.botAccount,
@@ -37,9 +43,9 @@ export async function postLotteryComment(
     rootPermlink,
     commentPermlink,
     body,
-    TAGS,
+    tags,
     APP_METADATA,
-    round.beneficiaries,
+    benForChain,
   );
   console.log(`Round ${round.roundNumber} posted with ${round.beneficiaries.length} beneficiaries`);
   return true;
