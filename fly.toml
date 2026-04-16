@@ -5,6 +5,7 @@ primary_region = "iad"
 
 [env]
   BOT_ACCOUNT = "swarmpost"
+  SYNC_FOLLOWS = "true"
 
 # No HTTP service — this is a scheduled job
 # Runs hourly via Fly Machines scheduled start
