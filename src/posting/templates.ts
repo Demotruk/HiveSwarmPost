@@ -172,7 +172,15 @@ export function roundCommentBody(round: LotteryRound, testMode: boolean = false)
   if (!testMode) {
     body += `The block used for randomness is determined by the round's scheduled time, not the actual posting time. `;
     body += `This prevents the operator from influencing the outcome by delaying the post. `;
-    body += `Anyone can independently verify this selection by looking up the BTC block at the scheduled timestamp.\n`;
+    body += `Anyone can independently verify this selection by looking up the BTC block at the scheduled timestamp.\n\n`;
+  }
+
+  body += `---\n`;
+  if (testMode) {
+    body += `*Test post — do not upvote*\n`;
+  } else {
+    body += `*Posted by [@swarmpost](/@swarmpost) — `;
+    body += `[source code](https://github.com/Demotruk/HiveSwarmPost)*\n`;
   }
 
   return body;
