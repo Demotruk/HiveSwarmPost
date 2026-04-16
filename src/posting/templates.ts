@@ -59,7 +59,7 @@ export function rootPostBody(
     body += `- Selection is weighted by onboarder trust and newbie activity\n`;
     body += `- Randomness sourced from the Bitcoin block at each round's **scheduled** time (not posting time)\n`;
     body += `- This means the operator cannot influence outcomes by delaying a post\n`;
-    body += `- [Full documentation](https://github.com/user/hive-swarm-post)\n\n`;
+    body += `- [Full documentation](https://github.com/Demotruk/HiveSwarmPost)\n\n`;
 
     body += `## Support\n\n`;
     body += `Upvote this post and its comments to fund new Hive users. `;
@@ -120,7 +120,7 @@ export function rootPostBody(
     body += `*Test post — do not upvote*\n`;
   } else {
     body += `*Posted by [@swarmpost](/@swarmpost) — `;
-    body += `[source code](https://github.com/user/hive-swarm-post)*\n`;
+    body += `[source code](https://github.com/Demotruk/HiveSwarmPost)*\n`;
   }
 
   return body;
