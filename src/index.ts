@@ -50,8 +50,11 @@ async function main(): Promise<void> {
 
   if (voters.length === 0) {
     console.log('No trust roots found. Cannot run lottery.');
-    // Still create root post with zero stats (no round 1 selection possible)
-    await ensureRootPost(config, date, 0, 0, 0, 0, null, null);
+    if (existingRounds.has(1)) {
+      console.log('Root post already exists; nothing to do.');
+    } else {
+      console.log('Skipping root post creation — no point posting with zero data.');
+    }
     return;
   }
 
@@ -109,6 +112,17 @@ async function main(): Promise<void> {
 
   // Run round 1 selection before creating root post so it carries the beneficiaries
   const rootPostExists = existingRounds.has(1);
+
+  // Don't create an empty root post when there are no eligible newbies. If the
+  // pool is empty and we haven't posted yet, skip entirely — we'd rather have
+  // no post than a content-free one that earns rewards with no beneficiaries.
+  // If the root already exists (created earlier in the day when the pool was
+  // non-empty), we still proceed to run any pending comment rounds.
+  if (!rootPostExists && rankedPool.length === 0) {
+    console.log('No eligible newbies and no root post yet today. Skipping post creation.');
+    return;
+  }
+
   if (!rootPostExists && rankedPool.length > 0 && pendingRounds.includes(1)) {
     round1 = await runRoundSelection(config, date, rankedPool, selectedThisRun, 1);
   }
@@ -198,8 +212,9 @@ async function runRoundSelection(
     selectedThisRun.add(newbie.account);
     return {
       newbie,
-      creator: newbie.onboarders.creator,
+      creator: newbie.onboarders.vouchedCreator || newbie.onboarders.creator,
       referrer: newbie.onboarders.referrer,
+      voucher: newbie.onboarders.voucher,
     };
   });
 

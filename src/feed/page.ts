@@ -67,8 +67,9 @@ export function feedPageHtml(): string {
         + '<div class="body">'
         + '<div class="title"><a href="' + n.introPost.url + '" target="_blank">' + esc(n.introPost.title || '(untitled)') + '</a></div>'
         + '<div class="meta">@' + esc(n.account) + ' &middot; ' + date
-        + ' &middot; onboarded by @' + esc(n.onboarders.creator)
+        + ' &middot; onboarded by @' + esc(n.onboarders.vouchedCreator || n.onboarders.creator)
         + (n.onboarders.referrer ? ' (ref: @' + esc(n.onboarders.referrer) + ')' : '')
+        + (n.onboarders.voucher ? ' (vouched by @' + esc(n.onboarders.voucher) + ')' : '')
         + '</div>'
         + '<span class="badge ' + (eligible ? 'eligible' : 'awaiting') + '">'
         + (eligible ? 'Eligible' : !n.introPost.isOldEnough ? 'Too new (&lt;24h)' : 'Awaiting trust vote')

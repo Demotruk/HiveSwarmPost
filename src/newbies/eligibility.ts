@@ -1,6 +1,7 @@
 import { getAccounts, getAccountCreatedDate, getOnboarderAttribution, getPostCommentCount } from '../hive/accounts.js';
 import { hiveCall, withRetry } from '../hive/client.js';
 import { postExists, getActiveVotes } from '../hive/posts.js';
+import { discoverVouches } from '../hive/vouches.js';
 import { activityWeight } from './activity.js';
 import type { Config, EligibleNewbie, IntroPostStatus, TrustGraph } from '../types.js';
 
@@ -72,6 +73,32 @@ export async function buildEligiblePool(
     }
   }
 
+  // Second pass: discover newbies via !vouch attestations on intro posts.
+  // This finds accounts whose on-chain creator isn't trusted but where a
+  // trust participant has attested the real onboarder via a comment.
+  const vouches = await discoverVouches(trustParticipants, windowStart);
+
+  for (const vouch of vouches) {
+    if (followable.has(vouch.newbie)) continue;
+    if (alreadySelected.has(vouch.newbie)) continue;
+
+    const creatorTrust = trustScores.get(vouch.attestedCreator) || 0;
+    if (creatorTrust === 0) continue;
+
+    followable.add(vouch.newbie);
+
+    try {
+      const newbie = await evaluateVouchedNewbie(
+        vouch, trustScores, trustParticipants, config, windowStart,
+      );
+      if (newbie) {
+        eligibleNewbies.push(newbie);
+      }
+    } catch (err) {
+      console.log(`Error evaluating vouched newbie ${vouch.newbie}: ${err}`);
+    }
+  }
+
   const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
   console.log(
     `Pool built in ${elapsed}s: ${eligibleNewbies.length} eligible, ${followable.size} followable`
@@ -118,6 +145,51 @@ async function evaluateNewbie(
 
   return {
     account: username,
+    createdAt,
+    onboarders,
+    activityWeight: weight,
+    onboarderTrust,
+    score,
+  };
+}
+
+/**
+ * Evaluate a vouched newbie — one discovered via a !vouch attestation
+ * rather than through the trusted-onboarder path. Uses the attested
+ * creator's trust score instead of the on-chain creator.
+ */
+async function evaluateVouchedNewbie(
+  vouch: { newbie: string; attestedCreator: string; voucher: string },
+  trustScores: Map<string, number>,
+  trustParticipants: Set<string>,
+  config: Config,
+  windowStart: Date,
+): Promise<EligibleNewbie | null> {
+  const [account] = await getAccounts([vouch.newbie]);
+  if (!account) return null;
+
+  const createdAt = getAccountCreatedDate(account);
+  if (createdAt < windowStart) return null;
+
+  const hasIntro = await hasQualifyingIntroPost(vouch.newbie, trustParticipants);
+  if (!hasIntro) return null;
+
+  const onboarders = await getOnboarderAttribution(vouch.newbie);
+  onboarders.vouchedCreator = vouch.attestedCreator;
+  onboarders.voucher = vouch.voucher;
+
+  const creatorTrust = trustScores.get(vouch.attestedCreator) || 0;
+  const referrerTrust = onboarders.referrer ? (trustScores.get(onboarders.referrer) || 0) : 0;
+  const onboarderTrust = creatorTrust + referrerTrust;
+
+  if (onboarderTrust === 0) return null;
+
+  const postCount = await getPostCommentCount(vouch.newbie, createdAt);
+  const weight = activityWeight(postCount, config.activityCap);
+  const score = onboarderTrust * weight;
+
+  return {
+    account: vouch.newbie,
     createdAt,
     onboarders,
     activityWeight: weight,
@@ -282,13 +354,22 @@ async function getAlreadySelectedNewbies(
     const exists = await postExists(config.botAccount, rootPermlink);
     if (!exists) continue;
 
-    for (let round = 1; round <= config.roundsPerDay; round++) {
+    // Round 1's beneficiaries live on the root post itself, not a -round-1 comment.
+    const rootPost = await withRetry(() =>
+      hiveCall<any>('condenser_api', 'get_content', [config.botAccount, rootPermlink])
+    );
+    if (rootPost?.beneficiaries) {
+      for (const ben of rootPost.beneficiaries) {
+        selected.add(ben.account);
+      }
+    }
+
+    // Rounds 2+ are comments
+    for (let round = 2; round <= config.roundsPerDay; round++) {
       const commentPermlink = `swarm-post-${dateStr}-round-${round}`;
       const commentExists = await postExists(config.botAccount, commentPermlink);
       if (!commentExists) continue;
 
-      // Parse the comment body to extract selected newbie accounts
-      // The comment body contains the beneficiary info in a structured format
       const comment = await withRetry(() =>
         hiveCall<any>('condenser_api', 'get_content', [config.botAccount, commentPermlink])
       );

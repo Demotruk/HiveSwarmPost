@@ -18,6 +18,10 @@ export interface Config {
 export interface OnboarderAttribution {
   creator: string;
   referrer: string | null;
+  /** Attested creator via !vouch — overrides on-chain creator for trust scoring and rewards */
+  vouchedCreator?: string;
+  /** Trust participant who made the !vouch attestation */
+  voucher?: string;
 }
 
 export interface EligibleNewbie {
@@ -38,6 +42,7 @@ export interface SelectedNewbie {
   newbie: EligibleNewbie;
   creator: string;
   referrer: string | null;
+  voucher?: string;
 }
 
 export interface LotteryRound {

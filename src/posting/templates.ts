@@ -1,4 +1,4 @@
-import type { LotteryRound, EligibleNewbie } from '../types.js';
+import type { LotteryRound, EligibleNewbie, SelectedNewbie } from '../types.js';
 
 /**
  * Break a Hive @mention so it displays the account name
@@ -17,6 +17,22 @@ function mention(account: string, testMode: boolean): string {
 /** Bold account mention */
 function boldMention(account: string, testMode: boolean): string {
   return `**${mention(account, testMode)}**`;
+}
+
+function selectedNewbieBlock(selected: SelectedNewbie, testMode: boolean): string {
+  const n = selected.newbie;
+  let block = `${boldMention(n.account, testMode)}\n`;
+  block += `- Creator: ${mention(selected.creator, testMode)}\n`;
+  if (selected.referrer && selected.referrer !== selected.creator) {
+    block += `- Referrer: ${mention(selected.referrer, testMode)}\n`;
+  }
+  if (selected.voucher) {
+    block += `- Vouched by: ${mention(selected.voucher, testMode)}\n`;
+  }
+  block += `- Onboarder trust: ${n.onboarderTrust.toFixed(2)}\n`;
+  block += `- Activity weight: ${n.activityWeight.toFixed(4)}\n`;
+  block += `- Score: ${n.score.toFixed(4)}\n\n`;
+  return block;
 }
 
 /**
@@ -70,15 +86,7 @@ export function rootPostBody(
     body += `## Round 1 — Selected Newbies\n\n`;
 
     for (const selected of round1.selected) {
-      const n = selected.newbie;
-      body += `${boldMention(n.account, testMode)}\n`;
-      body += `- Creator: ${mention(selected.creator, testMode)}\n`;
-      if (selected.referrer && selected.referrer !== selected.creator) {
-        body += `- Referrer: ${mention(selected.referrer, testMode)}\n`;
-      }
-      body += `- Onboarder trust: ${n.onboarderTrust.toFixed(2)}\n`;
-      body += `- Activity weight: ${n.activityWeight.toFixed(4)}\n`;
-      body += `- Score: ${n.score.toFixed(4)}\n\n`;
+      body += selectedNewbieBlock(selected, testMode);
     }
 
     body += `### Beneficiaries\n\n`;
@@ -141,15 +149,7 @@ export function roundCommentBody(round: LotteryRound, testMode: boolean = false)
   body += `### Selected Newbies\n\n`;
 
   for (const selected of round.selected) {
-    const n = selected.newbie;
-    body += `${boldMention(n.account, testMode)}\n`;
-    body += `- Creator: ${mention(selected.creator, testMode)}\n`;
-    if (selected.referrer && selected.referrer !== selected.creator) {
-      body += `- Referrer: ${mention(selected.referrer, testMode)}\n`;
-    }
-    body += `- Onboarder trust: ${n.onboarderTrust.toFixed(2)}\n`;
-    body += `- Activity weight: ${n.activityWeight.toFixed(4)}\n`;
-    body += `- Score: ${n.score.toFixed(4)}\n\n`;
+    body += selectedNewbieBlock(selected, testMode);
   }
 
   body += `### Beneficiaries\n\n`;

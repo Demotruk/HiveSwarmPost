@@ -1,4 +1,5 @@
 import { getAccounts, getAccountCreatedDate, getOnboarderAttribution, getPostCommentCount } from '../hive/accounts.js';
+import { discoverVouches } from '../hive/vouches.js';
 import { findNewbiesCreatedBy, findIntroPostWithStatus } from '../newbies/eligibility.js';
 import { activityWeight } from '../newbies/activity.js';
 import type { Config, FeedNewbie } from '../types.js';
@@ -44,6 +45,29 @@ export async function buildFeedPool(
     }
   }
 
+  // Vouch discovery: find newbies attested via !vouch on intro posts
+  const seen = new Set(feedNewbies.map(n => n.account));
+  const vouches = await discoverVouches(trustParticipants, windowStart);
+
+  for (const vouch of vouches) {
+    if (seen.has(vouch.newbie)) continue;
+    const creatorTrust = trustScores.get(vouch.attestedCreator) || 0;
+    if (creatorTrust === 0) continue;
+
+    try {
+      const result = await evaluateForFeed(
+        vouch.newbie, trustScores, trustParticipants, config, windowStart,
+        { vouchedCreator: vouch.attestedCreator, voucher: vouch.voucher },
+      );
+      if (result) {
+        seen.add(vouch.newbie);
+        feedNewbies.push(result);
+      }
+    } catch (err) {
+      console.log(`Error evaluating vouched newbie for feed ${vouch.newbie}: ${err}`);
+    }
+  }
+
   // Sort: fully eligible first by score desc, then ineligible by creation date desc
   const isEligible = (n: FeedNewbie) => n.introPost.hasTrustedVote && n.introPost.isOldEnough;
   feedNewbies.sort((a, b) => {
@@ -67,6 +91,7 @@ async function evaluateForFeed(
   trustParticipants: Set<string>,
   config: Config,
   windowStart: Date,
+  vouchOverride?: { vouchedCreator: string; voucher: string },
 ): Promise<FeedNewbie | null> {
   const [account] = await getAccounts([username]);
   if (!account) return null;
@@ -79,8 +104,13 @@ async function evaluateForFeed(
   if (!introPost) return null;
 
   const onboarders = await getOnboarderAttribution(username);
+  if (vouchOverride) {
+    onboarders.vouchedCreator = vouchOverride.vouchedCreator;
+    onboarders.voucher = vouchOverride.voucher;
+  }
 
-  const creatorTrust = trustScores.get(onboarders.creator) || 0;
+  const creator = onboarders.vouchedCreator || onboarders.creator;
+  const creatorTrust = trustScores.get(creator) || 0;
   const referrerTrust = onboarders.referrer ? (trustScores.get(onboarders.referrer) || 0) : 0;
   const onboarderTrust = creatorTrust + referrerTrust;
 
