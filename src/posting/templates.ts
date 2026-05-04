@@ -81,6 +81,20 @@ export function rootPostBody(
     body += `- This means the operator cannot influence outcomes by delaying a post\n`;
     body += `- [Full documentation](https://github.com/Demotruk/HiveSwarmPost)\n\n`;
 
+    body += `## How to Help New Users Enter the Lottery\n\n`;
+    body += `If you're part of the [trust network](https://hiveinvite.com/trust), you can help new Hive users `;
+    body += `become eligible for the lottery:\n\n`;
+    body += `**Vouch** — If you know who onboarded a new user but their on-chain creator `;
+    body += `is a service account (like @hiveonboard), comment on their introduction post:\n\n`;
+    body += `> \`!vouch @realcreator\`\n\n`;
+    body += `This tells the system who really brought them to Hive. The attested creator `;
+    body += `receives the onboarder's share of the rewards.\n\n`;
+    body += `**Sponsor** — If a new user has no trusted onboarder at all but you believe `;
+    body += `they are a real person worth supporting, comment on their introduction post:\n\n`;
+    body += `> \`!sponsor\`\n\n`;
+    body += `This makes you responsible for that account. You receive the onboarder's `;
+    body += `share of the rewards. Sponsoring requires a higher trust score than vouching.\n\n`;
+
     body += `## Support\n\n`;
     body += `Upvote this post and its comments to fund new Hive users. `;
     body += `Your vote weight counts toward the trust graph.\n\n`;
