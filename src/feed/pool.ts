@@ -1,5 +1,5 @@
 import { getAccounts, getAccountCreatedDate, getOnboarderAttribution, getPostCommentCount } from '../hive/accounts.js';
-import { discoverVouches } from '../hive/vouches.js';
+import { discoverVouchesAndSponsorships } from '../hive/vouches.js';
 import { findNewbiesCreatedBy, findIntroPostWithStatus } from '../newbies/eligibility.js';
 import { activityWeight } from '../newbies/activity.js';
 import type { Config, FeedNewbie } from '../types.js';
@@ -45,9 +45,11 @@ export async function buildFeedPool(
     }
   }
 
-  // Vouch discovery: find newbies attested via !vouch on intro posts
+  // Vouch and sponsor discovery
   const seen = new Set(feedNewbies.map(n => n.account));
-  const vouches = await discoverVouches(trustParticipants, windowStart);
+  const { vouches, sponsorships } = await discoverVouchesAndSponsorships(
+    trustParticipants, windowStart,
+  );
 
   for (const vouch of vouches) {
     if (seen.has(vouch.newbie)) continue;
@@ -65,6 +67,25 @@ export async function buildFeedPool(
       }
     } catch (err) {
       console.log(`Error evaluating vouched newbie for feed ${vouch.newbie}: ${err}`);
+    }
+  }
+
+  for (const sponsorship of sponsorships) {
+    if (seen.has(sponsorship.newbie)) continue;
+    const sponsorTrust = trustScores.get(sponsorship.sponsor) || 0;
+    if (sponsorTrust < config.sponsorMinTrust) continue;
+
+    try {
+      const result = await evaluateForFeed(
+        sponsorship.newbie, trustScores, trustParticipants, config, windowStart,
+        { sponsor: sponsorship.sponsor },
+      );
+      if (result) {
+        seen.add(sponsorship.newbie);
+        feedNewbies.push(result);
+      }
+    } catch (err) {
+      console.log(`Error evaluating sponsored newbie for feed ${sponsorship.newbie}: ${err}`);
     }
   }
 
@@ -91,7 +112,7 @@ async function evaluateForFeed(
   trustParticipants: Set<string>,
   config: Config,
   windowStart: Date,
-  vouchOverride?: { vouchedCreator: string; voucher: string },
+  override?: { vouchedCreator?: string; voucher?: string; sponsor?: string },
 ): Promise<FeedNewbie | null> {
   const [account] = await getAccounts([username]);
   if (!account) return null;
@@ -104,15 +125,23 @@ async function evaluateForFeed(
   if (!introPost) return null;
 
   const onboarders = await getOnboarderAttribution(username);
-  if (vouchOverride) {
-    onboarders.vouchedCreator = vouchOverride.vouchedCreator;
-    onboarders.voucher = vouchOverride.voucher;
+  if (override?.vouchedCreator) {
+    onboarders.vouchedCreator = override.vouchedCreator;
+    onboarders.voucher = override.voucher;
+  }
+  if (override?.sponsor) {
+    onboarders.sponsor = override.sponsor;
   }
 
-  const creator = onboarders.vouchedCreator || onboarders.creator;
-  const creatorTrust = trustScores.get(creator) || 0;
-  const referrerTrust = onboarders.referrer ? (trustScores.get(onboarders.referrer) || 0) : 0;
-  const onboarderTrust = creatorTrust + referrerTrust;
+  let onboarderTrust: number;
+  if (onboarders.sponsor) {
+    onboarderTrust = trustScores.get(onboarders.sponsor) || 0;
+  } else {
+    const creator = onboarders.vouchedCreator || onboarders.creator;
+    const creatorTrust = trustScores.get(creator) || 0;
+    const referrerTrust = onboarders.referrer ? (trustScores.get(onboarders.referrer) || 0) : 0;
+    onboarderTrust = creatorTrust + referrerTrust;
+  }
 
   if (onboarderTrust === 0) return null;
 

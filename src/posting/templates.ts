@@ -22,12 +22,16 @@ function boldMention(account: string, testMode: boolean): string {
 function selectedNewbieBlock(selected: SelectedNewbie, testMode: boolean): string {
   const n = selected.newbie;
   let block = `${boldMention(n.account, testMode)}\n`;
-  block += `- Creator: ${mention(selected.creator, testMode)}\n`;
-  if (selected.referrer && selected.referrer !== selected.creator) {
-    block += `- Referrer: ${mention(selected.referrer, testMode)}\n`;
-  }
-  if (selected.voucher) {
-    block += `- Vouched by: ${mention(selected.voucher, testMode)}\n`;
+  if (selected.sponsor) {
+    block += `- Sponsor: ${mention(selected.sponsor, testMode)}\n`;
+  } else {
+    block += `- Creator: ${mention(selected.creator, testMode)}\n`;
+    if (selected.referrer && selected.referrer !== selected.creator) {
+      block += `- Referrer: ${mention(selected.referrer, testMode)}\n`;
+    }
+    if (selected.voucher) {
+      block += `- Vouched by: ${mention(selected.voucher, testMode)}\n`;
+    }
   }
   block += `- Onboarder trust: ${n.onboarderTrust.toFixed(2)}\n`;
   block += `- Activity weight: ${n.activityWeight.toFixed(4)}\n`;

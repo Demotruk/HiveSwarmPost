@@ -10,6 +10,7 @@ export interface Config {
   roundsPerDay: number;
   newbiesPerRound: number;
   trustApiUrl: string;
+  sponsorMinTrust: number;
   dryRun: boolean;
   syncFollows: boolean;
   testMode: boolean;
@@ -22,6 +23,8 @@ export interface OnboarderAttribution {
   vouchedCreator?: string;
   /** Trust participant who made the !vouch attestation */
   voucher?: string;
+  /** Trust participant who !sponsor-ed this newbie — takes the creator beneficiary slot */
+  sponsor?: string;
 }
 
 export interface EligibleNewbie {
@@ -43,6 +46,7 @@ export interface SelectedNewbie {
   creator: string;
   referrer: string | null;
   voucher?: string;
+  sponsor?: string;
 }
 
 export interface LotteryRound {

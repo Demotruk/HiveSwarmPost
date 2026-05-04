@@ -210,11 +210,15 @@ async function runRoundSelection(
   const selected: SelectedNewbie[] = selectedIndices.map(idx => {
     const newbie = availablePool[idx];
     selectedThisRun.add(newbie.account);
+    const sponsored = !!newbie.onboarders.sponsor;
     return {
       newbie,
-      creator: newbie.onboarders.vouchedCreator || newbie.onboarders.creator,
-      referrer: newbie.onboarders.referrer,
+      creator: sponsored
+        ? newbie.onboarders.sponsor!
+        : (newbie.onboarders.vouchedCreator || newbie.onboarders.creator),
+      referrer: sponsored ? null : newbie.onboarders.referrer,
       voucher: newbie.onboarders.voucher,
+      sponsor: newbie.onboarders.sponsor,
     };
   });
 

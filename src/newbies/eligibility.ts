@@ -1,7 +1,7 @@
 import { getAccounts, getAccountCreatedDate, getOnboarderAttribution, getPostCommentCount } from '../hive/accounts.js';
 import { hiveCall, withRetry } from '../hive/client.js';
 import { postExists, getActiveVotes } from '../hive/posts.js';
-import { discoverVouches } from '../hive/vouches.js';
+import { discoverVouchesAndSponsorships } from '../hive/vouches.js';
 import { activityWeight } from './activity.js';
 import type { Config, EligibleNewbie, IntroPostStatus, TrustGraph } from '../types.js';
 
@@ -73,10 +73,10 @@ export async function buildEligiblePool(
     }
   }
 
-  // Second pass: discover newbies via !vouch attestations on intro posts.
-  // This finds accounts whose on-chain creator isn't trusted but where a
-  // trust participant has attested the real onboarder via a comment.
-  const vouches = await discoverVouches(trustParticipants, windowStart);
+  // Second pass: discover newbies via !vouch and !sponsor on intro posts.
+  const { vouches, sponsorships } = await discoverVouchesAndSponsorships(
+    trustParticipants, windowStart,
+  );
 
   for (const vouch of vouches) {
     if (followable.has(vouch.newbie)) continue;
@@ -96,6 +96,27 @@ export async function buildEligiblePool(
       }
     } catch (err) {
       console.log(`Error evaluating vouched newbie ${vouch.newbie}: ${err}`);
+    }
+  }
+
+  for (const sponsorship of sponsorships) {
+    if (followable.has(sponsorship.newbie)) continue;
+    if (alreadySelected.has(sponsorship.newbie)) continue;
+
+    const sponsorTrust = trustScores.get(sponsorship.sponsor) || 0;
+    if (sponsorTrust < config.sponsorMinTrust) continue;
+
+    followable.add(sponsorship.newbie);
+
+    try {
+      const newbie = await evaluateSponsoredNewbie(
+        sponsorship, trustScores, trustParticipants, config, windowStart,
+      );
+      if (newbie) {
+        eligibleNewbies.push(newbie);
+      }
+    } catch (err) {
+      console.log(`Error evaluating sponsored newbie ${sponsorship.newbie}: ${err}`);
     }
   }
 
@@ -194,6 +215,47 @@ async function evaluateVouchedNewbie(
     onboarders,
     activityWeight: weight,
     onboarderTrust,
+    score,
+  };
+}
+
+/**
+ * Evaluate a sponsored newbie — one where a trust participant has claimed
+ * responsibility via !sponsor. The sponsor's trust score is used directly
+ * and must meet the sponsorMinTrust threshold (checked by caller).
+ * The sponsor takes the creator beneficiary slot.
+ */
+async function evaluateSponsoredNewbie(
+  sponsorship: { newbie: string; sponsor: string },
+  trustScores: Map<string, number>,
+  trustParticipants: Set<string>,
+  config: Config,
+  windowStart: Date,
+): Promise<EligibleNewbie | null> {
+  const [account] = await getAccounts([sponsorship.newbie]);
+  if (!account) return null;
+
+  const createdAt = getAccountCreatedDate(account);
+  if (createdAt < windowStart) return null;
+
+  const hasIntro = await hasQualifyingIntroPost(sponsorship.newbie, trustParticipants);
+  if (!hasIntro) return null;
+
+  const onboarders = await getOnboarderAttribution(sponsorship.newbie);
+  onboarders.sponsor = sponsorship.sponsor;
+
+  const sponsorTrust = trustScores.get(sponsorship.sponsor) || 0;
+
+  const postCount = await getPostCommentCount(sponsorship.newbie, createdAt);
+  const weight = activityWeight(postCount, config.activityCap);
+  const score = sponsorTrust * weight;
+
+  return {
+    account: sponsorship.newbie,
+    createdAt,
+    onboarders,
+    activityWeight: weight,
+    onboarderTrust: sponsorTrust,
     score,
   };
 }
