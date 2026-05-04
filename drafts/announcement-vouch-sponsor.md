@@ -1,6 +1,6 @@
 # New: Vouch and Sponsor — Help More New Users Enter the Lottery
 
-The Swarm Post has been running for almost three weeks, but the eligible newbie pool has been empty most of that time. The core issue: the system only recognized new accounts created directly by trusted onboarders, which is a narrow gate. Many legitimate new users arrive through service accounts like @hiveonboard or @ecency, and the system had no way to include them.
+Many legitimate new users arrive on Hive through service accounts like @hiveonboard or @ecency rather than directly from a trusted onboarder. Until now, the system had no way to include them in the lottery.
 
 Today's update adds two new tools that anyone in the [trust network](https://hiveinvite.com/trust) can use — no special apps needed, just a comment on a new user's introduction post.
 
