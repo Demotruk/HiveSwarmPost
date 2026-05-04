@@ -358,9 +358,11 @@ export async function findNewbiesCreatedBy(
   const batchSize = 1000;
 
   while (true) {
+    // Hive requires start >= limit - 1, so cap the page size on the tail.
+    const limit = start === -1 ? batchSize : Math.min(batchSize, start + 1);
     const history = await withRetry<any[][]>(() =>
       hiveCall<any[][]>('condenser_api', 'get_account_history', [
-        creator, start, batchSize, ACCOUNT_CREATE_BITMASK,
+        creator, start, limit, ACCOUNT_CREATE_BITMASK,
       ])
     );
 
@@ -388,7 +390,7 @@ export async function findNewbiesCreatedBy(
     // Stop paginating once we've crossed past the window — nothing older
     // can be in-window.
     if (oldestInBatch && oldestInBatch < windowStart) break;
-    if (history.length < batchSize) break;
+    if (history.length < limit) break;
     start = history[0][0] - 1;
     if (start < 0) break;
   }

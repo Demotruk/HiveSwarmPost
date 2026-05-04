@@ -51,10 +51,12 @@ export async function getTrustDeclarations(username: string): Promise<Set<string
   let batchCount = 0;
 
   while (true) {
+    // Hive requires start >= limit - 1, so cap the page size on the tail.
+    const limit = start === -1 ? batchSize : Math.min(batchSize, start + 1);
     let history: any[][];
     try {
       history = await hiveCall<any[][]>('condenser_api', 'get_account_history', [
-        username, start, batchSize, CUSTOM_JSON_BITMASK,
+        username, start, limit, CUSTOM_JSON_BITMASK,
       ]);
     } catch {
       // Account may not exist or have no matching history;
@@ -92,7 +94,7 @@ export async function getTrustDeclarations(username: string): Promise<Set<string
     // no swarm_trust ops can exist before it.
     if (oldestInBatch && oldestInBatch < SWARM_TRUST_EPOCH) break;
 
-    if (history.length < batchSize) break;
+    if (history.length < limit) break;
     start = history[0][0] - 1;
     if (start < 0) break;
   }

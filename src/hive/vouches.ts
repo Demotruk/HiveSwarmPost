@@ -44,7 +44,7 @@ export async function discoverVouchesAndSponsorships(
   const sponsoredNewbies = new Set<string>();
   let startAuthor = '';
   let startPermlink = '';
-  const batchSize = 100;
+  const batchSize = 20;
   let totalScanned = 0;
 
   console.log('Scanning introduceyourself posts for !vouch and !sponsor attestations...');
