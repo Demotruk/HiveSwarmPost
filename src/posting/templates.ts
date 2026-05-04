@@ -59,6 +59,7 @@ export function rootPostBody(
     body += `> **This is a test post from a development account. Do not upvote.**\n\n`;
   } else {
     body += `# Hive Swarm Post — ${date}\n\n`;
+    body += `![swarm-post-header](https://files.peakd.com/file/peakd-hive/demotruk/23vhMrK7JCfo54PqqJ198PXNbcmd9kT3LJiCSLNk6P8F2KX6aE9LspF4tqNeSehAGEqZa.png)\n\n`;
     body += `The Swarm Post distributes author rewards to newly onboarded Hive users, `;
     body += `selected via a trust-weighted lottery with verifiable randomness.\n\n`;
   }
