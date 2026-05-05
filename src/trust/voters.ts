@@ -74,7 +74,7 @@ async function collectRecentVoters(config: Config, date: string): Promise<Set<st
  * Falls back to crawling from the bot account's own declarations
  * if the API is unreachable.
  */
-async function getBootstrapRoots(config: Config): Promise<VoterInfo[]> {
+export async function getBootstrapRoots(config: Config): Promise<VoterInfo[]> {
   let declarers: string[];
 
   try {

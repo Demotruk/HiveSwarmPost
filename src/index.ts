@@ -1,7 +1,7 @@
 import { loadConfig } from './config.js';
 import { initClient } from './hive/client.js';
 import { fetchTrustGraph } from './hive/trustApi.js';
-import { getVoterRoots } from './trust/voters.js';
+import { getVoterRoots, getBootstrapRoots } from './trust/voters.js';
 import { computeTrustScores } from './trust/graph.js';
 import { buildEligiblePool } from './newbies/eligibility.js';
 import { rankPool } from './newbies/scoring.js';
@@ -69,8 +69,22 @@ async function main(): Promise<void> {
   );
 
   // Compute trust scores
-  const trustScores = computeTrustScores(graph, voters, config.trustAttenuation, config.trustDepthCap);
-  console.log(`Trust scores computed for ${trustScores.size} onboarders`);
+  let trustScores = computeTrustScores(graph, voters, config.trustAttenuation, config.trustDepthCap);
+
+  // If voter-based BFS produced 0 scores (voters exist but aren't in the
+  // trust graph), fall back to bootstrap roots so the system keeps working
+  // during the transition period.
+  if (trustScores.size === 0 && voters.length > 0) {
+    console.log('Voter-based BFS produced 0 scores — supplementing with bootstrap roots');
+    const bootstrapRoots = await getBootstrapRoots(config);
+    // Merge: keep original voters + add bootstrap roots not already present
+    const existingAccounts = new Set(voters.map(v => v.account));
+    const combined = [...voters, ...bootstrapRoots.filter(b => !existingAccounts.has(b.account))];
+    trustScores = computeTrustScores(graph, combined, config.trustAttenuation, config.trustDepthCap);
+    console.log(`Trust scores (with bootstrap fallback): ${trustScores.size} onboarders`);
+  } else {
+    console.log(`Trust scores computed for ${trustScores.size} onboarders`);
+  }
 
   // All trust participants (for intro post upvote verification)
   const trustParticipants = new Set<string>();
