@@ -85,6 +85,13 @@ export async function buildEligiblePool(
     const creatorTrust = trustScores.get(vouch.attestedCreator) || 0;
     if (creatorTrust === 0) continue;
 
+    // Account must have been created within the eligibility window —
+    // a late intro post from an old account doesn't qualify.
+    const [vouchAccount] = await getAccounts([vouch.newbie]);
+    if (!vouchAccount) continue;
+    const vouchCreatedAt = getAccountCreatedDate(vouchAccount);
+    if (vouchCreatedAt < windowStart) continue;
+
     followable.add(vouch.newbie);
 
     try {
@@ -105,6 +112,12 @@ export async function buildEligiblePool(
 
     const sponsorTrust = trustScores.get(sponsorship.sponsor) || 0;
     if (sponsorTrust < config.sponsorMinTrust) continue;
+
+    // Account must have been created within the eligibility window.
+    const [sponsorAccount] = await getAccounts([sponsorship.newbie]);
+    if (!sponsorAccount) continue;
+    const sponsorCreatedAt = getAccountCreatedDate(sponsorAccount);
+    if (sponsorCreatedAt < windowStart) continue;
 
     followable.add(sponsorship.newbie);
 
