@@ -1,4 +1,4 @@
-import type { LotteryRound, EligibleNewbie } from '../types.js';
+import type { LotteryRound, EligibleNewbie, SelectedNewbie } from '../types.js';
 
 /**
  * Break a Hive @mention so it displays the account name
@@ -17,6 +17,26 @@ function mention(account: string, testMode: boolean): string {
 /** Bold account mention */
 function boldMention(account: string, testMode: boolean): string {
   return `**${mention(account, testMode)}**`;
+}
+
+function selectedNewbieBlock(selected: SelectedNewbie, testMode: boolean): string {
+  const n = selected.newbie;
+  let block = `${boldMention(n.account, testMode)}\n`;
+  if (selected.sponsor) {
+    block += `- Sponsor: ${mention(selected.sponsor, testMode)}\n`;
+  } else {
+    block += `- Creator: ${mention(selected.creator, testMode)}\n`;
+    if (selected.referrer && selected.referrer !== selected.creator) {
+      block += `- Referrer: ${mention(selected.referrer, testMode)}\n`;
+    }
+    if (selected.voucher) {
+      block += `- Vouched by: ${mention(selected.voucher, testMode)}\n`;
+    }
+  }
+  block += `- Onboarder trust: ${n.onboarderTrust.toFixed(2)}\n`;
+  block += `- Activity weight: ${n.activityWeight.toFixed(4)}\n`;
+  block += `- Score: ${n.score.toFixed(4)}\n\n`;
+  return block;
 }
 
 /**
@@ -39,6 +59,7 @@ export function rootPostBody(
     body += `> **This is a test post from a development account. Do not upvote.**\n\n`;
   } else {
     body += `# Hive Swarm Post — ${date}\n\n`;
+    body += `![swarm-post-header](https://files.peakd.com/file/peakd-hive/demotruk/23vhMrK7JCfo54PqqJ198PXNbcmd9kT3LJiCSLNk6P8F2KX6aE9LspF4tqNeSehAGEqZa.png)\n\n`;
     body += `The Swarm Post distributes author rewards to newly onboarded Hive users, `;
     body += `selected via a trust-weighted lottery with verifiable randomness.\n\n`;
   }
@@ -61,6 +82,20 @@ export function rootPostBody(
     body += `- This means the operator cannot influence outcomes by delaying a post\n`;
     body += `- [Full documentation](https://github.com/Demotruk/HiveSwarmPost)\n\n`;
 
+    body += `## How to Help New Users Enter the Lottery\n\n`;
+    body += `If you're part of the [trust network](https://hiveinvite.com/trust), you can help new Hive users `;
+    body += `become eligible for the lottery:\n\n`;
+    body += `**Vouch** — If you know who onboarded a new user but their on-chain creator `;
+    body += `is a service account (like @hiveonboard), comment on their introduction post:\n\n`;
+    body += `> \`!vouch @realcreator\`\n\n`;
+    body += `This tells the system who really brought them to Hive. The attested creator `;
+    body += `receives the onboarder's share of the rewards.\n\n`;
+    body += `**Sponsor** — If a new user has no trusted onboarder at all but you believe `;
+    body += `they are a real person worth supporting, comment on their introduction post:\n\n`;
+    body += `> \`!sponsor\`\n\n`;
+    body += `This makes you responsible for that account. You receive the onboarder's `;
+    body += `share of the rewards. Sponsoring requires a higher trust score than vouching.\n\n`;
+
     body += `## Support\n\n`;
     body += `Upvote this post and its comments to fund new Hive users. `;
     body += `Your vote weight counts toward the trust graph.\n\n`;
@@ -70,15 +105,7 @@ export function rootPostBody(
     body += `## Round 1 — Selected Newbies\n\n`;
 
     for (const selected of round1.selected) {
-      const n = selected.newbie;
-      body += `${boldMention(n.account, testMode)}\n`;
-      body += `- Creator: ${mention(selected.creator, testMode)}\n`;
-      if (selected.referrer && selected.referrer !== selected.creator) {
-        body += `- Referrer: ${mention(selected.referrer, testMode)}\n`;
-      }
-      body += `- Onboarder trust: ${n.onboarderTrust.toFixed(2)}\n`;
-      body += `- Activity weight: ${n.activityWeight.toFixed(4)}\n`;
-      body += `- Score: ${n.score.toFixed(4)}\n\n`;
+      body += selectedNewbieBlock(selected, testMode);
     }
 
     body += `### Beneficiaries\n\n`;
@@ -141,15 +168,7 @@ export function roundCommentBody(round: LotteryRound, testMode: boolean = false)
   body += `### Selected Newbies\n\n`;
 
   for (const selected of round.selected) {
-    const n = selected.newbie;
-    body += `${boldMention(n.account, testMode)}\n`;
-    body += `- Creator: ${mention(selected.creator, testMode)}\n`;
-    if (selected.referrer && selected.referrer !== selected.creator) {
-      body += `- Referrer: ${mention(selected.referrer, testMode)}\n`;
-    }
-    body += `- Onboarder trust: ${n.onboarderTrust.toFixed(2)}\n`;
-    body += `- Activity weight: ${n.activityWeight.toFixed(4)}\n`;
-    body += `- Score: ${n.score.toFixed(4)}\n\n`;
+    body += selectedNewbieBlock(selected, testMode);
   }
 
   body += `### Beneficiaries\n\n`;
