@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { scanBlocksForNewAccounts, getBlockDaysAgo } from '../hive/blocks.js';
-import { findRebloggableIntroPosts, executeReblogs, expireOldReblogs } from './shared.js';
+import { findFirstPosts, executeReblogs, expireOldReblogs } from './shared.js';
 import type { ReblogFeedConfig, AllFeedState } from '../types.js';
 
 function stateFilePath(config: ReblogFeedConfig): string {
@@ -58,9 +58,8 @@ export async function runAllFeedCycle(config: ReblogFeedConfig): Promise<void> {
 
   console.log(`Accounts in ${config.allFeedWindowDays}-day window: ${inWindow.length}`);
 
-  // Pass empty trust participants — Feed 2 doesn't filter on trusted votes
-  const posts = await findRebloggableIntroPosts(inWindow, alreadyReblogged, new Set());
-  console.log(`Rebloggable intro posts: ${posts.length}`);
+  const posts = await findFirstPosts(inWindow, alreadyReblogged);
+  console.log(`First posts to reblog: ${posts.length}`);
 
   const reblogged = await executeReblogs(config.allFeedAccount, posts, config.dryRun);
 

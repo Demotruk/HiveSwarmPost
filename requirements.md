@@ -362,7 +362,7 @@ A single shared account (e.g. `@hive-newbies`) that reblogs intro posts from all
 
 - **Scope**: All new accounts detected via block scanning
 - **Window**: 10 days from account creation
-- **Reblog trigger**: New account publishes a post tagged `introduceyourself` within the window
+- **Reblog trigger**: New account publishes their first root post within the window (any topic, not limited to `introduceyourself`)
 - **Cost**: Free to follow — single shared account, no subscription
 
 ### Feed 3: Personal Trust Network Newbies (Per-Subscriber)
