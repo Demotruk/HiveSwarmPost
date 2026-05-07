@@ -40,7 +40,13 @@ export async function runAllFeedCycle(config: ReblogFeedConfig): Promise<void> {
     console.log(`Resuming from block ${fromBlock}`);
   }
 
-  const { accounts: newAccounts, lastBlock } = await scanBlocksForNewAccounts(fromBlock);
+  const { accounts: newAccounts, lastBlock } = await scanBlocksForNewAccounts(
+    fromBlock,
+    (_accounts, scannedBlock) => {
+      state.lastBlock = scannedBlock;
+      saveState(config, state);
+    },
+  );
   console.log(`Found ${newAccounts.length} new accounts`);
 
   // Filter to accounts within the window

@@ -16,8 +16,15 @@ export interface BlockScanResult {
 /**
  * Scan blocks from `fromBlock` to head for account creation ops.
  * Returns the new accounts found and the last block scanned.
+ *
+ * Optional `onProgress` callback is called periodically with the
+ * accounts found so far and the last block successfully scanned,
+ * allowing callers to persist incremental progress.
  */
-export async function scanBlocksForNewAccounts(fromBlock: number): Promise<BlockScanResult> {
+export async function scanBlocksForNewAccounts(
+  fromBlock: number,
+  onProgress?: (accounts: NewAccount[], lastBlock: number) => void,
+): Promise<BlockScanResult> {
   const dgp = await withRetry(() => getClient().database.getDynamicGlobalProperties());
   const headBlock = dgp.head_block_number;
 
@@ -66,6 +73,7 @@ export async function scanBlocksForNewAccounts(fromBlock: number): Promise<Block
     scanned += count;
     if (scanned % 50_000 < BLOCKS_PER_BATCH) {
       console.log(`  ${scanned.toLocaleString()}/${totalBlocks.toLocaleString()} blocks scanned, ${accounts.length} accounts found`);
+      if (onProgress) onProgress(accounts, from + count - 1);
     }
   }
 
