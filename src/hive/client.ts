@@ -5,7 +5,7 @@ let privateKey: PrivateKey;
 
 export function initClient(config: { hiveNodes: string[]; postingKey?: string }): void {
   client = new Client(config.hiveNodes, {
-    timeout: 10000,
+    timeout: 30000,
     failoverThreshold: 3,
   });
   if (config.postingKey) {

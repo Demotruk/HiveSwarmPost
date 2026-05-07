@@ -56,7 +56,10 @@ export function loadConfig(opts?: { requireKeys?: boolean }): Config {
 }
 
 export function loadReblogFeedConfig(): ReblogFeedConfig {
+  const dryRun = boolEnv('DRY_RUN', false);
   const personalEnabled = boolEnv('PERSONAL_FEED_ENABLED', false);
+  // In dry-run mode, keys and account names are optional (no broadcasts)
+  const reqKey = (name: string) => dryRun ? env(name, '') : requireEnv(name);
   return {
     hiveNodes: HIVE_NODES,
     trustApiUrl: env('TRUST_API_URL', 'https://swarm-trust-api.fly.dev'),
@@ -65,20 +68,20 @@ export function loadReblogFeedConfig(): ReblogFeedConfig {
     voterWindowDays: intEnv('VOTER_WINDOW_DAYS', 7),
     roundsPerDay: intEnv('ROUNDS_PER_DAY', 10),
     dataDir: env('REBLOG_FEED_DATA_DIR', './data/reblog-feeds'),
-    dryRun: boolEnv('DRY_RUN', false),
+    dryRun,
     // Feed 1
-    trustedFeedAccount: requireEnv('TRUSTED_FEED_ACCOUNT'),
-    trustedFeedPostingKey: requireEnv('TRUSTED_FEED_POSTING_KEY'),
+    trustedFeedAccount: env('TRUSTED_FEED_ACCOUNT', 'swarmpost-newbies'),
+    trustedFeedPostingKey: reqKey('TRUSTED_FEED_POSTING_KEY'),
     trustedFeedWindowDays: intEnv('TRUSTED_FEED_WINDOW_DAYS', 30),
     // Feed 2
-    allFeedAccount: requireEnv('ALL_FEED_ACCOUNT'),
-    allFeedPostingKey: requireEnv('ALL_FEED_POSTING_KEY'),
+    allFeedAccount: env('ALL_FEED_ACCOUNT', 'hive-newbies'),
+    allFeedPostingKey: reqKey('ALL_FEED_POSTING_KEY'),
     allFeedWindowDays: intEnv('ALL_FEED_WINDOW_DAYS', 10),
     // Feed 3
     personalFeedEnabled: personalEnabled,
     botAccount: env('BOT_ACCOUNT', 'swarmpost'),
-    botActiveKey: personalEnabled ? requireEnv('BOT_ACTIVE_KEY') : '',
-    masterSecret: personalEnabled ? requireEnv('REBLOG_FEED_MASTER_SECRET') : '',
+    botActiveKey: personalEnabled ? reqKey('BOT_ACTIVE_KEY') : '',
+    masterSecret: personalEnabled ? reqKey('REBLOG_FEED_MASTER_SECRET') : '',
     personalFeedWindowDays: intEnv('REBLOG_FEED_WINDOW_DAYS', 30),
     delegationVests: env('REBLOG_FEED_DELEGATION_VESTS', '15.000000 VESTS'),
     accountPrefix: env('REBLOG_FEED_ACCOUNT_PREFIX', 'nf-'),

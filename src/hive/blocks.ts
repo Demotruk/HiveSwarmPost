@@ -1,7 +1,7 @@
 import { getClient, withRetry } from './client.js';
 
 const BLOCK_INTERVAL_SECONDS = 3;
-const BLOCKS_PER_BATCH = 1000;
+const BLOCKS_PER_BATCH = 100;
 
 export interface NewAccount {
   account: string;
@@ -47,8 +47,12 @@ export async function scanBlocksForNewAccounts(fromBlock: number): Promise<Block
         const timestamp = block.timestamp;
         for (const tx of block.transactions) {
           for (const op of tx.operations) {
-            const [opType, opData] = op;
-            if (opType === 'account_create' || opType === 'create_claimed_account') {
+            const opType = Array.isArray(op) ? op[0] : op?.type;
+            const opData = Array.isArray(op) ? op[1] : op?.value;
+            if (
+              opType === 'account_create' || opType === 'create_claimed_account' ||
+              opType === 'account_create_operation' || opType === 'create_claimed_account_operation'
+            ) {
               accounts.push({
                 account: opData.new_account_name,
                 createdAt: timestamp + 'Z',
