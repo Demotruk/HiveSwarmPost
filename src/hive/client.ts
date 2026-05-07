@@ -1,10 +1,9 @@
 import { Client, PrivateKey } from '@hiveio/dhive';
-import type { Config } from '../types.js';
 
 let client: Client;
 let privateKey: PrivateKey;
 
-export function initClient(config: Config): void {
+export function initClient(config: { hiveNodes: string[]; postingKey?: string }): void {
   client = new Client(config.hiveNodes, {
     timeout: 10000,
     failoverThreshold: 3,
@@ -22,6 +21,17 @@ export function getClient(): Client {
 export function getPrivateKey(): PrivateKey {
   if (!privateKey) throw new Error('Private key not initialized. Call initClient first.');
   return privateKey;
+}
+
+/**
+ * Broadcast operations with an explicit private key (instead of the global one).
+ * Used by Feed 3 to reblog with per-subscriber managed account keys.
+ */
+export async function broadcastWithKey(
+  ops: any[],
+  key: PrivateKey,
+): Promise<void> {
+  await getClient().broadcast.sendOperations(ops, key);
 }
 
 /**

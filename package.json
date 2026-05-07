@@ -10,6 +10,7 @@
     "dev": "tsx src/index.ts",
     "simulate": "tsx src/simulate.ts",
     "feed": "tsx src/feed.ts",
+    "reblog-feeds": "tsx src/reblog-feeds.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

@@ -92,3 +92,56 @@ export interface VoterInfo {
   account: string;
   hp: number;
 }
+
+
+export interface ReblogFeedConfig {
+  hiveNodes: string[];
+  trustApiUrl: string;
+  trustAttenuation: number;
+  trustDepthCap: number;
+  voterWindowDays: number;
+  roundsPerDay: number;
+  dataDir: string;
+  dryRun: boolean;
+  // Feed 1: Trusted Network Newbies
+  trustedFeedAccount: string;
+  trustedFeedPostingKey: string;
+  trustedFeedWindowDays: number;
+  // Feed 2: All New Users
+  allFeedAccount: string;
+  allFeedPostingKey: string;
+  allFeedWindowDays: number;
+  // Feed 3: Personal Trust Network
+  personalFeedEnabled: boolean;
+  botAccount: string;
+  botActiveKey: string;
+  masterSecret: string;
+  personalFeedWindowDays: number;
+  delegationVests: string;
+  accountPrefix: string;
+  paymentAmount: string;
+  paymentMemo: string;
+}
+
+export interface SharedReblogState {
+  lastProcessedAt: string;
+  reblogged: Record<string, string>; // "author/permlink" -> ISO timestamp
+}
+
+export interface AllFeedState extends SharedReblogState {
+  lastBlock: number;
+}
+
+export interface PersonalFeedSubscriber {
+  subscriber: string;
+  managedAccount: string;
+  paymentTimestamp: string;
+  delegated: boolean;
+  lastProcessedAt: string;
+  reblogged: Record<string, string>;
+}
+
+export interface PersonalFeedState {
+  lastPaymentScanAt: string;
+  subscribers: Record<string, PersonalFeedSubscriber>;
+}

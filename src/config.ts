@@ -1,4 +1,4 @@
-import type { Config } from './types.js';
+import type { Config, ReblogFeedConfig } from './types.js';
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -28,16 +28,18 @@ function boolEnv(name: string, defaultValue: boolean): boolean {
   return value === 'true' || value === '1';
 }
 
+const HIVE_NODES = [
+  'https://api.hive.blog',
+  'https://api.deathwing.me',
+  'https://api.openhive.network',
+];
+
 export function loadConfig(opts?: { requireKeys?: boolean }): Config {
   const requireKeys = opts?.requireKeys ?? true;
   return {
     postingKey: requireKeys ? requireEnv('POSTING_KEY') : env('POSTING_KEY', ''),
     botAccount: env('BOT_ACCOUNT', 'swarmpost'),
-    hiveNodes: [
-      'https://api.hive.blog',
-      'https://api.deathwing.me',
-      'https://api.openhive.network',
-    ],
+    hiveNodes: HIVE_NODES,
     eligibilityWindowDays: intEnv('ELIGIBILITY_WINDOW_DAYS', 30),
     activityCap: intEnv('ACTIVITY_CAP', 10),
     trustAttenuation: floatEnv('TRUST_ATTENUATION', 0.5),
@@ -50,5 +52,37 @@ export function loadConfig(opts?: { requireKeys?: boolean }): Config {
     dryRun: boolEnv('DRY_RUN', false),
     syncFollows: boolEnv('SYNC_FOLLOWS', false),
     testMode: boolEnv('TEST_MODE', false),
+  };
+}
+
+export function loadReblogFeedConfig(): ReblogFeedConfig {
+  const personalEnabled = boolEnv('PERSONAL_FEED_ENABLED', false);
+  return {
+    hiveNodes: HIVE_NODES,
+    trustApiUrl: env('TRUST_API_URL', 'https://swarm-trust-api.fly.dev'),
+    trustAttenuation: floatEnv('TRUST_ATTENUATION', 0.5),
+    trustDepthCap: intEnv('TRUST_DEPTH_CAP', 4),
+    voterWindowDays: intEnv('VOTER_WINDOW_DAYS', 7),
+    roundsPerDay: intEnv('ROUNDS_PER_DAY', 10),
+    dataDir: env('REBLOG_FEED_DATA_DIR', './data/reblog-feeds'),
+    dryRun: boolEnv('DRY_RUN', false),
+    // Feed 1
+    trustedFeedAccount: requireEnv('TRUSTED_FEED_ACCOUNT'),
+    trustedFeedPostingKey: requireEnv('TRUSTED_FEED_POSTING_KEY'),
+    trustedFeedWindowDays: intEnv('TRUSTED_FEED_WINDOW_DAYS', 30),
+    // Feed 2
+    allFeedAccount: requireEnv('ALL_FEED_ACCOUNT'),
+    allFeedPostingKey: requireEnv('ALL_FEED_POSTING_KEY'),
+    allFeedWindowDays: intEnv('ALL_FEED_WINDOW_DAYS', 10),
+    // Feed 3
+    personalFeedEnabled: personalEnabled,
+    botAccount: env('BOT_ACCOUNT', 'swarmpost'),
+    botActiveKey: personalEnabled ? requireEnv('BOT_ACTIVE_KEY') : '',
+    masterSecret: personalEnabled ? requireEnv('REBLOG_FEED_MASTER_SECRET') : '',
+    personalFeedWindowDays: intEnv('REBLOG_FEED_WINDOW_DAYS', 30),
+    delegationVests: env('REBLOG_FEED_DELEGATION_VESTS', '15.000000 VESTS'),
+    accountPrefix: env('REBLOG_FEED_ACCOUNT_PREFIX', 'nf-'),
+    paymentAmount: env('REBLOG_FEED_PAYMENT_AMOUNT', '0.500 HBD'),
+    paymentMemo: env('REBLOG_FEED_PAYMENT_MEMO', 'feed3'),
   };
 }

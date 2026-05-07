@@ -18,6 +18,7 @@ npm run start        # Production run (node dist/index.js)
 npm run dev          # Dev run (tsx src/index.ts)
 npm run simulate     # Offline simulation with fixtures
 npm run feed         # HTTP feed server (port 3000)
+npm run reblog-feeds # Reblog feed bots (3 feeds: trusted, all, personal)
 npm run test         # Run tests (vitest)
 npm run test:watch   # Watch mode
 ```
@@ -32,6 +33,13 @@ npm run test:watch   # Watch mode
 - `src/newbies/` — Eligibility pool building, activity scoring
 - `src/trust/` — Trust graph (BFS with hop attenuation), voter discovery
 - `src/posting/` — Post/comment generation and markdown templates
+- `src/reblog-feeds.ts` — Reblog feed bots entry point (3 feeds in one cycle)
+- `src/reblog/` — Reblog feed logic (trustedFeed, allFeed, personalFeed, shared utilities)
+- `src/hive/blocks.ts` — Block-range scanning for account creation ops
+- `src/hive/reblog.ts` — Reblog broadcast operation
+- `src/hive/transfers.ts` — Incoming transfer history scanning
+- `src/hive/accountCreate.ts` — Claimed account creation for Feed 3
+- `src/hive/delegation.ts` — HP delegation for Feed 3 managed accounts
 - `src/feed/` — Feed server (pool collection, HTML rendering)
 - `tests/` — Unit tests (selection, trust-graph, beneficiaries, activity, scheduler)
 

@@ -343,6 +343,54 @@ A minimal static web page allows users to manage their trust declarations. No ba
 - Uses Hive Keychain (`window.hive_keychain.requestCustomJson`) for signing with Posting authority
 - Can be hosted on GitHub Pages or any static file host
 
+## Newbie Discovery Feeds
+
+Three reblog-based feed accounts that surface new Hive users in subscribers' normal reading flow. Each feed is a Hive account operated by the bot that reblogs qualifying introduction posts, so any user who follows the feed account sees those posts in their timeline on Peakd, Ecency, or any Hive frontend.
+
+### Feed 1: Trusted Network Newbies (Global)
+
+A single shared account (e.g. `@swarmpost-newbies`) that reblogs intro posts from newbies onboarded by anyone with a nonzero trust score in the Swarm Post trust graph.
+
+- **Scope**: Global — same trust network used by the lottery
+- **Eligibility window**: 30 days from account creation (matches lottery eligibility)
+- **Reblog trigger**: Newbie has a qualifying intro post (tagged `introduceyourself`, within eligibility window) and their onboarder has a positive trust score
+- **Cost**: Free to follow — single shared account, no subscription
+
+### Feed 2: All New Users
+
+A single shared account (e.g. `@hive-newbies`) that reblogs intro posts from all new Hive accounts, regardless of trust status.
+
+- **Scope**: All new accounts detected via block scanning
+- **Window**: 10 days from account creation
+- **Reblog trigger**: New account publishes a post tagged `introduceyourself` within the window
+- **Cost**: Free to follow — single shared account, no subscription
+
+### Feed 3: Personal Trust Network Newbies (Per-Subscriber)
+
+A managed, per-subscriber Hive account that reblogs intro posts from newbies onboarded by accounts within the subscriber's personal trust network.
+
+- **Trust computation**: BFS from the subscriber's account as the sole root, using their HP, through the global `swarm_trust` declaration graph. Same attenuation (0.5^hops) and depth cap (4 hops) as the lottery trust graph. An onboarder qualifies if they have a nonzero trust score in this personalized subgraph.
+- **Eligibility window**: 30 days from account creation
+- **Reblog trigger**: Newbie has a qualifying intro post and their onboarder has a positive trust score in the subscriber's personal graph
+- **Account lifecycle**: Bot creates and custodies the account (keys never shared with the subscriber). The subscriber simply follows the account.
+- **Naming**: e.g. `@newbies-for-alice` (TBD — must fit Hive's 16-char account name limit)
+
+#### Payment Model
+
+Feed 3 is a paid service. Payment is verified entirely on-chain via Hive transfers.
+
+- **Payment**: One-time fee of 0.5 HBD sent to the bot account with a memo identifying the subscription (e.g. `feed3` or a specific identifier)
+- **Activation**: On payment, bot creates the feed account using claimed account tickets or on-chain `account_create`. The fee covers the account token cost.
+- **Perpetual service**: Once paid, the feed runs indefinitely with no further payments required.
+- **RC/HP management**: Each feed account needs sufficient Resource Credits to reblog. The bot delegates HP to managed accounts as needed.
+
+### Operational Requirements
+
+- **Sync frequency**: Periodic scan (e.g. every hour, aligned with lottery runs) to detect new qualifying intro posts and reblog them
+- **Deduplication**: Never reblog the same post twice
+- **RC budget**: Monitor Resource Credits across all managed accounts. Alert if any account is RC-starved.
+- **Reblog scope**: Intro posts only (tagged `introduceyourself`). Not all posts from newbies.
+
 ## Open Questions
 
 - **Voter window tuning**: 7 days is a starting point. Too short = volatile. Too long = stale trust from inactive voters.
