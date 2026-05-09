@@ -3,6 +3,7 @@ import { hiveCall, withRetry } from './client.js';
 // Hive account names: 3–16 chars, lowercase letters/digits/dots/hyphens.
 const VOUCH_PATTERN = /!vouch\s+@?([a-z][a-z0-9.-]{2,15})/i;
 const SPONSOR_PATTERN = /!sponsor\b/i;
+const REJECT_PATTERN = /!reject\b/i;
 
 export interface VouchAttestation {
   newbie: string;
@@ -17,9 +18,16 @@ export interface SponsorAttestation {
   introPermlink: string;
 }
 
+export interface RejectionAttestation {
+  newbie: string;
+  rejector: string;
+  introPermlink: string;
+}
+
 export interface DiscoveryResult {
   vouches: VouchAttestation[];
   sponsorships: SponsorAttestation[];
+  rejections: RejectionAttestation[];
 }
 
 /**
@@ -37,17 +45,20 @@ export interface DiscoveryResult {
 export async function discoverVouchesAndSponsorships(
   trustParticipants: Set<string>,
   windowStart: Date,
+  authorizedRejectors?: Set<string>,
 ): Promise<DiscoveryResult> {
   const vouches: VouchAttestation[] = [];
   const sponsorships: SponsorAttestation[] = [];
+  const rejections: RejectionAttestation[] = [];
   const vouchedNewbies = new Set<string>();
   const sponsoredNewbies = new Set<string>();
+  const rejectedNewbies = new Set<string>();
   let startAuthor = '';
   let startPermlink = '';
   const batchSize = 20;
   let totalScanned = 0;
 
-  console.log('Scanning introduceyourself posts for !vouch and !sponsor attestations...');
+  console.log('Scanning introduceyourself posts for !vouch, !sponsor, and !reject attestations...');
 
   while (true) {
     const query: Record<string, unknown> = {
@@ -72,8 +83,8 @@ export async function discoverVouchesAndSponsorships(
       const postDate = new Date(post.created + 'Z');
 
       if (postDate < windowStart) {
-        logSummary(totalScanned, vouches.length, sponsorships.length);
-        return { vouches, sponsorships };
+        logSummary(totalScanned, vouches.length, sponsorships.length, rejections.length);
+        return { vouches, sponsorships, rejections };
       }
 
       totalScanned++;
@@ -84,6 +95,28 @@ export async function discoverVouchesAndSponsorships(
         hiveCall<any[]>('condenser_api', 'get_content_replies', [post.author, post.permlink])
       );
       if (!replies) continue;
+
+      // Check for !reject from authorized rejectors first — a single
+      // rejection disqualifies the newbie regardless of vouches/sponsors.
+      if (authorizedRejectors && !rejectedNewbies.has(post.author)) {
+        for (const reply of replies) {
+          if (!authorizedRejectors.has(reply.author)) continue;
+          if (REJECT_PATTERN.test(reply.body)) {
+            rejectedNewbies.add(post.author);
+            rejections.push({
+              newbie: post.author,
+              rejector: reply.author,
+              introPermlink: post.permlink,
+            });
+            console.log(
+              `  Reject: @${reply.author} rejected @${post.author}`
+            );
+            break;
+          }
+        }
+      }
+
+      if (rejectedNewbies.has(post.author)) continue;
 
       // Collect all vouches and sponsors from trust participants on this post.
       // A single person can only contribute one action (vouch OR sponsor).
@@ -147,13 +180,13 @@ export async function discoverVouchesAndSponsorships(
     startPermlink = lastPost.permlink;
   }
 
-  logSummary(totalScanned, vouches.length, sponsorships.length);
-  return { vouches, sponsorships };
+  logSummary(totalScanned, vouches.length, sponsorships.length, rejections.length);
+  return { vouches, sponsorships, rejections };
 }
 
-function logSummary(scanned: number, vouches: number, sponsors: number): void {
+function logSummary(scanned: number, vouches: number, sponsors: number, rejections: number): void {
   console.log(
-    `  Scanned ${scanned} intro posts, found ${vouches} vouches and ${sponsors} sponsorships`
+    `  Scanned ${scanned} intro posts, found ${vouches} vouches, ${sponsors} sponsorships, ${rejections} rejections`
   );
 }
 
@@ -177,4 +210,9 @@ export function parseVouch(body: string): string | null {
 /** Parse a !sponsor command from a comment body. Exported for testing. */
 export function parseSponsor(body: string): boolean {
   return SPONSOR_PATTERN.test(body);
+}
+
+/** Parse a !reject command from a comment body. Exported for testing. */
+export function parseReject(body: string): boolean {
+  return REJECT_PATTERN.test(body);
 }

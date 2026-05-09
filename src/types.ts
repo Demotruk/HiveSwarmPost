@@ -11,6 +11,7 @@ export interface Config {
   newbiesPerRound: number;
   trustApiUrl: string;
   sponsorMinTrust: number;
+  rejectTopVoters: number;
   dryRun: boolean;
   syncFollows: boolean;
   testMode: boolean;

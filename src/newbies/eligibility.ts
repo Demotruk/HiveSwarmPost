@@ -29,6 +29,7 @@ export async function buildEligiblePool(
   trustParticipants: Set<string>,
   config: Config,
   date: string,
+  authorizedRejectors?: Set<string>,
 ): Promise<{ eligible: EligibleNewbie[]; followable: string[] }> {
   const eligibleNewbies: EligibleNewbie[] = [];
   const followable = new Set<string>();
@@ -74,13 +75,26 @@ export async function buildEligiblePool(
   }
 
   // Second pass: discover newbies via !vouch and !sponsor on intro posts.
-  const { vouches, sponsorships } = await discoverVouchesAndSponsorships(
-    trustParticipants, windowStart,
+  // Also collects !reject attestations from authorized rejectors.
+  const { vouches, sponsorships, rejections } = await discoverVouchesAndSponsorships(
+    trustParticipants, windowStart, authorizedRejectors,
   );
+
+  const rejectedAccounts = new Set(rejections.map(r => r.newbie));
+  if (rejectedAccounts.size > 0) {
+    console.log(`Rejected accounts: ${Array.from(rejectedAccounts).join(', ')}`);
+    // Remove any already-added newbies that were rejected
+    for (let i = eligibleNewbies.length - 1; i >= 0; i--) {
+      if (rejectedAccounts.has(eligibleNewbies[i].account)) {
+        eligibleNewbies.splice(i, 1);
+      }
+    }
+  }
 
   for (const vouch of vouches) {
     if (followable.has(vouch.newbie)) continue;
     if (alreadySelected.has(vouch.newbie)) continue;
+    if (rejectedAccounts?.has(vouch.newbie)) continue;
 
     const creatorTrust = trustScores.get(vouch.attestedCreator) || 0;
     if (creatorTrust === 0) continue;
@@ -109,6 +123,7 @@ export async function buildEligiblePool(
   for (const sponsorship of sponsorships) {
     if (followable.has(sponsorship.newbie)) continue;
     if (alreadySelected.has(sponsorship.newbie)) continue;
+    if (rejectedAccounts?.has(sponsorship.newbie)) continue;
 
     const sponsorTrust = trustScores.get(sponsorship.sponsor) || 0;
     if (sponsorTrust < config.sponsorMinTrust) continue;

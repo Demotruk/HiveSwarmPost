@@ -1,7 +1,7 @@
 import { loadConfig } from './config.js';
 import { initClient } from './hive/client.js';
 import { fetchTrustGraph } from './hive/trustApi.js';
-import { getVoterRoots, getBootstrapRoots } from './trust/voters.js';
+import { getVoterRoots, getBootstrapRoots, getAuthorizedRejectors } from './trust/voters.js';
 import { computeTrustScores } from './trust/graph.js';
 import { buildEligiblePool } from './newbies/eligibility.js';
 import { rankPool } from './newbies/scoring.js';
@@ -94,11 +94,13 @@ async function main(): Promise<void> {
     for (const t of trusted) trustParticipants.add(t);
   }
 
-  // 4. Build eligible newbie pool
+  // 4. Get authorized rejectors and build eligible newbie pool
+  const authorizedRejectors = await getAuthorizedRejectors(config, date, config.rejectTopVoters);
+
   console.log('Building eligible newbie pool...');
   const onboarderAccounts = Array.from(trustScores.keys());
   const { eligible, followable } = await buildEligiblePool(
-    onboarderAccounts, trustScores, trustParticipants, config, date,
+    onboarderAccounts, trustScores, trustParticipants, config, date, authorizedRejectors,
   );
   const rankedPool = rankPool(eligible);
   console.log(`Ranked pool: ${rankedPool.length} newbies`);

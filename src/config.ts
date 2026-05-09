@@ -49,6 +49,7 @@ export function loadConfig(opts?: { requireKeys?: boolean }): Config {
     newbiesPerRound: intEnv('NEWBIES_PER_ROUND', 1),
     trustApiUrl: env('TRUST_API_URL', 'https://swarm-trust-api.fly.dev'),
     sponsorMinTrust: intEnv('SPONSOR_MIN_TRUST', 1000),
+    rejectTopVoters: intEnv('REJECT_TOP_VOTERS', 10),
     dryRun: boolEnv('DRY_RUN', false),
     syncFollows: boolEnv('SYNC_FOLLOWS', false),
     testMode: boolEnv('TEST_MODE', false),

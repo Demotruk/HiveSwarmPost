@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseVouch, parseSponsor } from '../src/hive/vouches.js';
+import { parseVouch, parseSponsor, parseReject } from '../src/hive/vouches.js';
 
 describe('parseVouch', () => {
   it('parses "!vouch @creator" with @ prefix', () => {
@@ -74,6 +74,35 @@ describe('parseSponsor', () => {
 
   it('does not match vouch as sponsor', () => {
     expect(parseSponsor('!vouch @creator')).toBe(false);
+  });
+});
+
+describe('parseReject', () => {
+  it('detects "!reject" in a comment', () => {
+    expect(parseReject('!reject')).toBe(true);
+  });
+
+  it('detects "!reject" embedded in text', () => {
+    expect(parseReject('This account looks like a test account. !reject')).toBe(true);
+  });
+
+  it('is case-insensitive', () => {
+    expect(parseReject('!Reject')).toBe(true);
+    expect(parseReject('!REJECT')).toBe(true);
+  });
+
+  it('returns false when no reject present', () => {
+    expect(parseReject('Welcome to Hive!')).toBe(false);
+  });
+
+  it('does not match "!rejecting" or "!rejected"', () => {
+    expect(parseReject('I am !rejecting this user')).toBe(false);
+    expect(parseReject('This user was !rejected')).toBe(false);
+  });
+
+  it('does not match vouch or sponsor as reject', () => {
+    expect(parseReject('!vouch @creator')).toBe(false);
+    expect(parseReject('!sponsor')).toBe(false);
   });
 });
 

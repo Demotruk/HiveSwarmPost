@@ -90,6 +90,61 @@ export async function getBootstrapRoots(config: Config): Promise<VoterInfo[]> {
 }
 
 /**
+ * Get the top N voters by rshares on the previous day's swarm post.
+ * These accounts are authorized to issue !reject commands on intro posts.
+ * Uses yesterday's post so the set is stable throughout today's run.
+ */
+export async function getAuthorizedRejectors(
+  config: Config,
+  date: string,
+  topN: number,
+): Promise<Set<string>> {
+  const today = new Date(date + 'T00:00:00Z');
+  const yesterday = new Date(today);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  const yesterdayStr = yesterday.toISOString().slice(0, 10);
+  const rootPermlink = `swarm-post-${yesterdayStr}`;
+
+  const exists = await postExists(config.botAccount, rootPermlink);
+  if (!exists) {
+    console.log(`No swarm post found for ${yesterdayStr} — no authorized rejectors`);
+    return new Set();
+  }
+
+  const voterRshares = new Map<string, number>();
+
+  const rootVotes = await getActiveVotes(config.botAccount, rootPermlink);
+  for (const vote of rootVotes) {
+    const rshares = Number(vote.rshares) || 0;
+    if (rshares > 0) {
+      voterRshares.set(vote.voter, (voterRshares.get(vote.voter) || 0) + rshares);
+    }
+  }
+
+  for (let round = 2; round <= config.roundsPerDay; round++) {
+    const commentPermlink = `swarm-post-${yesterdayStr}-round-${round}`;
+    const commentExists = await postExists(config.botAccount, commentPermlink);
+    if (!commentExists) continue;
+
+    const commentVotes = await getActiveVotes(config.botAccount, commentPermlink);
+    for (const vote of commentVotes) {
+      const rshares = Number(vote.rshares) || 0;
+      if (rshares > 0) {
+        voterRshares.set(vote.voter, (voterRshares.get(vote.voter) || 0) + rshares);
+      }
+    }
+  }
+
+  const sorted = Array.from(voterRshares.entries())
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, topN)
+    .map(([account]) => account);
+
+  console.log(`Authorized rejectors (top ${topN} voters on ${yesterdayStr}): ${sorted.join(', ')}`);
+  return new Set(sorted);
+}
+
+/**
  * Get VoterInfo (account + HP) for a batch of accounts.
  */
 async function getVoterInfoBatch(accountNames: string[]): Promise<VoterInfo[]> {

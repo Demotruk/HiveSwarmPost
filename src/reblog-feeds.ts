@@ -35,6 +35,7 @@ async function main(): Promise<void> {
     newbiesPerRound: 1,
     trustApiUrl: config.trustApiUrl,
     sponsorMinTrust: 1000,
+    rejectTopVoters: 10,
     dryRun: config.dryRun,
     syncFollows: false,
     testMode: false,
