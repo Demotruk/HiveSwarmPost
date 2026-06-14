@@ -32,6 +32,11 @@ const HIVE_NODES = [
   'https://api.hive.blog',
   'https://api.deathwing.me',
   'https://api.openhive.network',
+  'https://anyx.io',
+  'https://hive-api.arcange.eu',
+  'https://api.c0ff33a.uk',
+  'https://rpc.ausbit.dev',
+  'https://techcoderx.com',
 ];
 
 export function loadConfig(opts?: { requireKeys?: boolean }): Config {

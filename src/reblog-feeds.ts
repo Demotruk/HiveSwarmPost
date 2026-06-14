@@ -1,5 +1,5 @@
 import { loadReblogFeedConfig } from './config.js';
-import { initClient } from './hive/client.js';
+import { initClient, logNodeHealth } from './hive/client.js';
 import { fetchTrustGraph } from './hive/trustApi.js';
 import { getVoterRoots, getBootstrapRoots } from './trust/voters.js';
 import { computeTrustScores } from './trust/graph.js';
@@ -76,6 +76,7 @@ async function main(): Promise<void> {
   // Feed 3: Personal Trust Network
   await runPersonalFeedCycle(config, graph, trustParticipants);
 
+  logNodeHealth();
   console.log('\n=== Reblog feed cycle complete ===');
 }
 

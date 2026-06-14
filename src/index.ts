@@ -1,5 +1,5 @@
 import { loadConfig } from './config.js';
-import { initClient } from './hive/client.js';
+import { initClient, logNodeHealth } from './hive/client.js';
 import { fetchTrustGraph } from './hive/trustApi.js';
 import { getVoterRoots, getBootstrapRoots, getAuthorizedRejectors } from './trust/voters.js';
 import { computeTrustScores } from './trust/graph.js';
@@ -110,11 +110,15 @@ async function main(): Promise<void> {
   // we want to follow brand-new accounts before they've made an intro post,
   // so the bot sees their activity early.
   if (config.syncFollows) {
-    console.log('Syncing follow list...');
-    const currentFollows = await getFollowing(config.botAccount);
-    console.log(`Current follows: ${currentFollows.length}, desired: ${followable.length}`);
-    const result = await syncFollows(followable, currentFollows, config.botAccount, config.dryRun);
-    console.log(`Follow sync complete: +${result.followed.length} -${result.unfollowed.length}`);
+    try {
+      console.log('Syncing follow list...');
+      const currentFollows = await getFollowing(config.botAccount);
+      console.log(`Current follows: ${currentFollows.length}, desired: ${followable.length}`);
+      const result = await syncFollows(followable, currentFollows, config.botAccount, config.dryRun);
+      console.log(`Follow sync complete: +${result.followed.length} -${result.unfollowed.length}`);
+    } catch (err) {
+      console.log(`Follow sync failed (continuing without): ${err}`);
+    }
   }
 
   // 6. Run round 1 selection and create root post (root post IS round 1)
@@ -276,7 +280,9 @@ async function findExistingRounds(
 }
 
 // Run
-main().catch(err => {
-  console.error('Fatal error:', err);
-  process.exit(1);
-});
+main()
+  .finally(() => logNodeHealth())
+  .catch(err => {
+    console.error('Fatal error:', err);
+    process.exit(1);
+  });
