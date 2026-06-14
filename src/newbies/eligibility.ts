@@ -1,7 +1,7 @@
 import { getAccounts, getAccountCreatedDate, getOnboarderAttribution, getPostCommentCount } from '../hive/accounts.js';
 import { hiveCall, withRetry } from '../hive/client.js';
-import { postExists, getActiveVotes } from '../hive/posts.js';
-import { discoverVouchesAndSponsorships } from '../hive/vouches.js';
+import { getActiveVotes } from '../hive/posts.js';
+import { discoverVouchesAndSponsorships, type VouchAttestation, type SponsorAttestation, type RejectionAttestation } from '../hive/vouches.js';
 import { activityWeight } from './activity.js';
 import type { Config, EligibleNewbie, IntroPostStatus, TrustGraph } from '../types.js';
 
@@ -76,9 +76,19 @@ export async function buildEligiblePool(
 
   // Second pass: discover newbies via !vouch and !sponsor on intro posts.
   // Also collects !reject attestations from authorized rejectors.
-  const { vouches, sponsorships, rejections } = await discoverVouchesAndSponsorships(
-    trustParticipants, windowStart, authorizedRejectors,
-  );
+  let vouches: VouchAttestation[] = [];
+  let sponsorships: SponsorAttestation[] = [];
+  let rejections: RejectionAttestation[] = [];
+  try {
+    const result = await discoverVouchesAndSponsorships(
+      trustParticipants, windowStart, authorizedRejectors,
+    );
+    vouches = result.vouches;
+    sponsorships = result.sponsorships;
+    rejections = result.rejections;
+  } catch (err) {
+    console.log(`Error scanning attestations (continuing without): ${err}`);
+  }
 
   const rejectedAccounts = new Set(rejections.map(r => r.newbie));
   if (rejectedAccounts.size > 0) {
@@ -430,47 +440,42 @@ export async function findNewbiesCreatedBy(
  * Get the set of newbie accounts that have already been selected as
  * beneficiaries in Swarm Post comments during the eligibility window.
  */
-async function getAlreadySelectedNewbies(
+export async function getAlreadySelectedNewbies(
   config: Config,
   date: string,
 ): Promise<Set<string>> {
   const selected = new Set<string>();
   const now = new Date(date + 'T00:00:00Z');
 
+  // Fetch a Swarm Post (root or round comment) and add its beneficiaries to
+  // `selected`. The read goes through withRetry so a flaky node can't make a
+  // real post look absent — a silent miss here would let an already-awarded
+  // newbie be selected a second time (see the @hallszn double-award). A
+  // genuinely missing post returns an object with an empty author.
+  const collectBeneficiaries = async (permlink: string): Promise<boolean> => {
+    const post = await withRetry<any>(() =>
+      hiveCall<any>('condenser_api', 'get_content', [config.botAccount, permlink])
+    );
+    if (!post || post.author === '') return false;
+    for (const ben of post.beneficiaries || []) {
+      selected.add(ben.account);
+    }
+    return true;
+  };
+
   for (let dayOffset = 0; dayOffset < config.eligibilityWindowDays; dayOffset++) {
     const d = new Date(now);
     d.setUTCDate(d.getUTCDate() - dayOffset);
     const dateStr = d.toISOString().slice(0, 10);
-    const rootPermlink = `swarm-post-${dateStr}`;
 
-    const exists = await postExists(config.botAccount, rootPermlink);
-    if (!exists) continue;
+    // Round 1's beneficiaries live on the root post itself, not a -round-1
+    // comment. No root post means no rounds that day either.
+    const rootExists = await collectBeneficiaries(`swarm-post-${dateStr}`);
+    if (!rootExists) continue;
 
-    // Round 1's beneficiaries live on the root post itself, not a -round-1 comment.
-    const rootPost = await withRetry(() =>
-      hiveCall<any>('condenser_api', 'get_content', [config.botAccount, rootPermlink])
-    );
-    if (rootPost?.beneficiaries) {
-      for (const ben of rootPost.beneficiaries) {
-        selected.add(ben.account);
-      }
-    }
-
-    // Rounds 2+ are comments
+    // Rounds 2+ are comments.
     for (let round = 2; round <= config.roundsPerDay; round++) {
-      const commentPermlink = `swarm-post-${dateStr}-round-${round}`;
-      const commentExists = await postExists(config.botAccount, commentPermlink);
-      if (!commentExists) continue;
-
-      const comment = await withRetry(() =>
-        hiveCall<any>('condenser_api', 'get_content', [config.botAccount, commentPermlink])
-      );
-
-      if (comment?.beneficiaries) {
-        for (const ben of comment.beneficiaries) {
-          selected.add(ben.account);
-        }
-      }
+      await collectBeneficiaries(`swarm-post-${dateStr}-round-${round}`);
     }
   }
 

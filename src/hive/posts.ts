@@ -6,11 +6,16 @@ import type { BeneficiaryEntry } from '../types.js';
  */
 export async function postExists(author: string, permlink: string): Promise<boolean> {
   try {
-    const content = await getClient().database.call('get_content', [author, permlink]);
+    // Retry across nodes: a single flaky node must not be mistaken for a
+    // missing post. A genuinely non-existent post returns an empty author.
+    const content = await withRetry(() =>
+      getClient().database.call('get_content', [author, permlink])
+    );
     // get_content returns an object with empty author if post doesn't exist
     return content && content.author !== '';
   } catch {
-    // Some nodes throw for non-existent posts instead of returning empty
+    // Some nodes throw for non-existent posts instead of returning empty.
+    // Only reached after retries are exhausted across all nodes.
     return false;
   }
 }
