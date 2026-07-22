@@ -11,6 +11,7 @@
     "simulate": "tsx src/simulate.ts",
     "feed": "tsx src/feed.ts",
     "reblog-feeds": "tsx src/reblog-feeds.ts",
+    "rc-delegate": "tsx src/rc-delegate.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

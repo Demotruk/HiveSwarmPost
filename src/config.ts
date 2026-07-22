@@ -1,4 +1,4 @@
-import type { Config, ReblogFeedConfig } from './types.js';
+import type { Config, ReblogFeedConfig, RcDelegationConfig } from './types.js';
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -93,5 +93,22 @@ export function loadReblogFeedConfig(): ReblogFeedConfig {
     accountPrefix: env('REBLOG_FEED_ACCOUNT_PREFIX', 'nf-'),
     paymentAmount: env('REBLOG_FEED_PAYMENT_AMOUNT', '0.500 HBD'),
     paymentMemo: env('REBLOG_FEED_PAYMENT_MEMO', 'feed3'),
+  };
+}
+
+export function loadRcDelegationConfig(): RcDelegationConfig {
+  const dryRun = boolEnv('DRY_RUN', false);
+  const enabled = boolEnv('RC_DELEGATION_ENABLED', false);
+  // The posting key is only needed when we actually broadcast — i.e. the
+  // feature is enabled and not a dry run.
+  const needsKey = enabled && !dryRun;
+  return {
+    enabled,
+    delegatorAccount: env('RC_DELEGATOR_ACCOUNT', ''),
+    postingKey: needsKey ? requireEnv('RC_DELEGATOR_POSTING_KEY') : env('RC_DELEGATOR_POSTING_KEY', ''),
+    // Default 15B RC — comfortable daily activity for an engaged newbie.
+    amount: intEnv('RC_DELEGATION_AMOUNT', 15_000_000_000),
+    batchSize: intEnv('RC_DELEGATION_BATCH_SIZE', 100),
+    dryRun,
   };
 }

@@ -124,6 +124,24 @@ export interface ReblogFeedConfig {
   paymentMemo: string;
 }
 
+/**
+ * Config for the RC-delegation service: automatically delegate resource
+ * credits to trustworthy newbies who have posted a qualifying intro, and
+ * reclaim those delegations once the account ages out of the window.
+ */
+export interface RcDelegationConfig {
+  enabled: boolean;
+  /** Account that delegates RC (separate funded account). Uses its posting key. */
+  delegatorAccount: string;
+  /** Posting key of the delegator account (empty in dry-run). */
+  postingKey: string;
+  /** RC to delegate to each newbie, in raw RC units (e.g. 15000000000 = 15B). */
+  amount: number;
+  /** How many delegatees to include per custom_json op. */
+  batchSize: number;
+  dryRun: boolean;
+}
+
 export interface SharedReblogState {
   lastProcessedAt: string;
   reblogged: Record<string, string>; // "author/permlink" -> ISO timestamp

@@ -12,6 +12,24 @@ import type { Config, EligibleNewbie, IntroPostStatus, TrustGraph } from '../typ
 const ACCOUNT_CREATE_BITMASK = (1 << 9) | (1 << 23);
 
 /**
+ * True when an error is a definitive "post does not exist" assert from a
+ * hivemind node (as opposed to a transient network/RPC failure). The message
+ * lives in different fields depending on how dhive wraps the RPCError, so we
+ * check all the likely spots.
+ */
+function isPostNotFound(err: any): boolean {
+  const candidates = [
+    err?.message,
+    err?.jse_shortmsg,
+    err?.jse_info?.message,
+    err?.jse_info?.extension?.assertion_expression,
+  ];
+  return candidates.some(
+    (c) => typeof c === 'string' && c.includes('does not exist'),
+  );
+}
+
+/**
  * Build the pool of eligible newbies for the lottery.
  *
  * Returns two pools:
@@ -450,12 +468,22 @@ export async function getAlreadySelectedNewbies(
   // Fetch a Swarm Post (root or round comment) and add its beneficiaries to
   // `selected`. The read goes through withRetry so a flaky node can't make a
   // real post look absent — a silent miss here would let an already-awarded
-  // newbie be selected a second time (see the @hallszn double-award). A
-  // genuinely missing post returns an object with an empty author.
+  // newbie be selected a second time (see the @hallszn double-award).
+  //
+  // Legacy nodes return an object with an empty author for a missing post;
+  // hivemind nodes instead throw an assert exception ("Post ... does not
+  // exist"). We convert that *definitive* not-found into the empty-author
+  // sentinel inside the retry callback, so it's treated as absent without
+  // burning retries — while genuine transient errors still throw and retry.
   const collectBeneficiaries = async (permlink: string): Promise<boolean> => {
-    const post = await withRetry<any>(() =>
-      hiveCall<any>('condenser_api', 'get_content', [config.botAccount, permlink])
-    );
+    const post = await withRetry<any>(async () => {
+      try {
+        return await hiveCall<any>('condenser_api', 'get_content', [config.botAccount, permlink]);
+      } catch (err) {
+        if (isPostNotFound(err)) return { author: '' };
+        throw err;
+      }
+    });
     if (!post || post.author === '') return false;
     for (const ben of post.beneficiaries || []) {
       selected.add(ben.account);
