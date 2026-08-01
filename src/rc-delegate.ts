@@ -16,6 +16,8 @@ async function main(): Promise<void> {
 
   console.log(`Delegator: @${rcConfig.delegatorAccount || '(unset)'}`);
   console.log(`Amount: ${rcConfig.amount} RC  Dry run: ${rcConfig.dryRun}`);
+  console.log(`Exempt accounts: ${rcConfig.exemptAccounts.join(', ') || '(none)'}`);
+  console.log(`Reclaimable amounts: ${rcConfig.managedAmounts.join(', ')}`);
 
   if (!rcConfig.enabled) {
     console.log('RC delegation disabled (RC_DELEGATION_ENABLED=false). Exiting.');

@@ -139,6 +139,19 @@ export interface RcDelegationConfig {
   amount: number;
   /** How many delegatees to include per custom_json op. */
   batchSize: number;
+  /**
+   * Accounts the bot must never touch — neither reclaim from nor delegate to.
+   * The delegator's outgoing delegations include any made by hand, and those
+   * would otherwise look like aged-out bot delegations and get wiped.
+   */
+  exemptAccounts: string[];
+  /**
+   * Every RC amount this bot has ever delegated (current `amount` plus any
+   * historical values). A delegation of some other size was made by hand and is
+   * never reclaimed. Historical values must stay listed, or delegations made
+   * under an older amount become permanently unreclaimable.
+   */
+  managedAmounts: number[];
   dryRun: boolean;
 }
 

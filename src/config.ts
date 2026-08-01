@@ -96,9 +96,34 @@ export function loadReblogFeedConfig(): ReblogFeedConfig {
   };
 }
 
+/**
+ * Accounts that are always protected from RC reclaim, regardless of env config.
+ * These hold manual delegations from the delegator account that predate (or sit
+ * outside) the newbie programme. Baked in so a missing env var can't wipe them
+ * a second time; RC_DELEGATION_EXEMPT_ACCOUNTS adds to this list, never replaces it.
+ */
+const DEFAULT_RC_EXEMPT_ACCOUNTS = ['hivepostify'];
+
+/** Parse a comma/whitespace-separated account list: trims, drops '@', lowercases. */
+function accountListEnv(name: string): string[] {
+  return env(name, '')
+    .split(/[,\s]+/)
+    .map(a => a.trim().toLowerCase().replace(/^@/, ''))
+    .filter(a => a.length > 0);
+}
+
+/** Parse a comma/whitespace-separated list of integers, dropping unparseable entries. */
+function intListEnv(name: string): number[] {
+  return env(name, '')
+    .split(/[,\s]+/)
+    .map(v => parseInt(v.trim(), 10))
+    .filter(v => Number.isFinite(v));
+}
+
 export function loadRcDelegationConfig(): RcDelegationConfig {
   const dryRun = boolEnv('DRY_RUN', false);
   const enabled = boolEnv('RC_DELEGATION_ENABLED', false);
+  const amount = intEnv('RC_DELEGATION_AMOUNT', 15_000_000_000);
   // The posting key is only needed when we actually broadcast — i.e. the
   // feature is enabled and not a dry run.
   const needsKey = enabled && !dryRun;
@@ -107,8 +132,20 @@ export function loadRcDelegationConfig(): RcDelegationConfig {
     delegatorAccount: env('RC_DELEGATOR_ACCOUNT', ''),
     postingKey: needsKey ? requireEnv('RC_DELEGATOR_POSTING_KEY') : env('RC_DELEGATOR_POSTING_KEY', ''),
     // Default 15B RC — comfortable daily activity for an engaged newbie.
-    amount: intEnv('RC_DELEGATION_AMOUNT', 15_000_000_000),
+    amount,
+    // Only delegations of a size this bot hands out are ever reclaimed. Keep
+    // past amounts in RC_DELEGATION_PAST_AMOUNTS whenever `amount` changes.
+    managedAmounts: [...new Set([amount, ...intListEnv('RC_DELEGATION_PAST_AMOUNTS')])],
     batchSize: intEnv('RC_DELEGATION_BATCH_SIZE', 100),
+    exemptAccounts: [
+      ...new Set([
+        ...DEFAULT_RC_EXEMPT_ACCOUNTS,
+        ...accountListEnv('RC_DELEGATION_EXEMPT_ACCOUNTS'),
+        // Never reclaim from ourselves if the delegator ever self-delegates.
+        env('RC_DELEGATOR_ACCOUNT', '').toLowerCase(),
+        env('BOT_ACCOUNT', 'swarmpost').toLowerCase(),
+      ]),
+    ].filter(a => a.length > 0),
     dryRun,
   };
 }

@@ -1,6 +1,6 @@
 import { PrivateKey } from '@hiveio/dhive';
 import { getAccounts, getAccountCreatedDate } from '../hive/accounts.js';
-import { delegateRc, getRcDelegationsFrom } from '../hive/rc.js';
+import { delegateRc, getRcDelegationsFrom, type RcDelegation } from '../hive/rc.js';
 import type { Config, RcDelegationConfig, EligibleNewbie } from '../types.js';
 
 export interface RcPlan {
@@ -10,23 +10,66 @@ export interface RcPlan {
   toReclaim: string[];
 }
 
+/** Normalize an account name for comparison: trim, drop a leading '@', lowercase. */
+function normalizeAccount(name: string): string {
+  return name.trim().toLowerCase().replace(/^@/, '');
+}
+
+/**
+ * Split current delegations into ones this bot plausibly created and ones it
+ * did not, by comparing the on-chain amount against the amounts the bot ever
+ * delegates. A delegation of any other size was set by hand, so it is not ours
+ * to reclaim — this protects manual delegations that nobody remembered to add
+ * to the exempt list.
+ *
+ * `managedAmounts` must include historical amounts as well as the current one,
+ * otherwise changing RC_DELEGATION_AMOUNT would strand every delegation made
+ * under the old value as permanently unreclaimable.
+ */
+export function partitionByManagedAmount(
+  delegations: RcDelegation[],
+  managedAmounts: number[],
+): { managed: string[]; foreign: RcDelegation[] } {
+  const amounts = new Set(managedAmounts.map(Number));
+  const managed: string[] = [];
+  const foreign: RcDelegation[] = [];
+  for (const d of delegations) {
+    // rc_api may hand back int64 as a string; normalize before comparing.
+    if (amounts.has(Number(d.delegated_rc))) managed.push(d.to);
+    else foreign.push(d);
+  }
+  return { managed, foreign };
+}
+
 /**
  * Decide RC actions purely from set membership.
  *
  * - Delegate to every eligible newbie we don't already delegate to.
  * - Reclaim from aged-out delegatees (created before the window) unless they
  *   are somehow still eligible — the eligible set always wins over reclaim.
+ * - Never touch an exempt account in either direction. The delegator's outgoing
+ *   delegations include any made by hand, and to this planner those are
+ *   indistinguishable from stale bot delegations: not in the eligible pool, and
+ *   old enough to look aged out. Without the exemption they get reclaimed to 0.
+ *   Exemption also blocks delegation, so a manual delegation of a different size
+ *   is never overwritten with the configured newbie amount.
  */
 export function planRcActions(params: {
   eligible: string[];
   currentDelegatees: string[];
   agedOut: string[];
+  exempt?: string[];
 }): RcPlan {
-  const current = new Set(params.currentDelegatees);
-  const eligibleSet = new Set(params.eligible);
+  const current = new Set(params.currentDelegatees.map(normalizeAccount));
+  const eligibleSet = new Set(params.eligible.map(normalizeAccount));
+  const exempt = new Set((params.exempt ?? []).map(normalizeAccount));
 
-  const toDelegate = params.eligible.filter(a => !current.has(a));
-  const toReclaim = params.agedOut.filter(a => !eligibleSet.has(a));
+  const toDelegate = params.eligible.filter(
+    a => !current.has(normalizeAccount(a)) && !exempt.has(normalizeAccount(a)),
+  );
+  const toReclaim = params.agedOut.filter(
+    a => !eligibleSet.has(normalizeAccount(a)) && !exempt.has(normalizeAccount(a)),
+  );
 
   return { toDelegate, toReclaim };
 }
@@ -71,12 +114,33 @@ export async function runRcDelegationCycle(
   const currentDelegatees = existing.map(d => d.to);
   console.log(`@${delegator} currently delegates RC to ${currentDelegatees.length} account(s)`);
 
-  // Determine which current delegatees have aged out of the window.
+  // Two independent guards keep a manual delegation out of the reclaim plan.
+  // 1. The exempt list — accounts explicitly declared off-limits.
+  const exempt = new Set(rcConfig.exemptAccounts.map(a => a.trim().toLowerCase()));
+  const protectedDelegatees = existing.filter(d => exempt.has(d.to.toLowerCase()));
+  if (protectedDelegatees.length > 0) {
+    console.log(`  Protected by exempt list: ${protectedDelegatees.map(d => d.to).join(', ')}`);
+  }
+
+  // 2. The amount guard — a delegation whose size isn't one this bot ever hands
+  //    out was set by hand, so it isn't ours to reclaim even if unlisted.
+  const { managed: managedDelegatees, foreign } = partitionByManagedAmount(
+    existing.filter(d => !exempt.has(d.to.toLowerCase())),
+    rcConfig.managedAmounts,
+  );
+  if (foreign.length > 0) {
+    console.log(
+      `  Protected by amount mismatch (not delegated by this bot): ` +
+        foreign.map(d => `${d.to}=${d.delegated_rc}`).join(', '),
+    );
+  }
+
+  // Determine which managed delegatees have aged out of the window.
   const windowStart = new Date(date + 'T00:00:00Z');
   windowStart.setUTCDate(windowStart.getUTCDate() - config.eligibilityWindowDays);
 
   const agedOut: string[] = [];
-  for (const batch of chunk(currentDelegatees, 100)) {
+  for (const batch of chunk(managedDelegatees, 100)) {
     const accounts = await getAccounts(batch);
     const found = new Map<string, any>(accounts.map(a => [a.name, a]));
     for (const name of batch) {
@@ -90,6 +154,7 @@ export async function runRcDelegationCycle(
     eligible: eligibleAccounts,
     currentDelegatees,
     agedOut,
+    exempt: rcConfig.exemptAccounts,
   });
 
   console.log(`Plan: delegate to ${toDelegate.length}, reclaim from ${toReclaim.length}`);
