@@ -1,4 +1,5 @@
 import { loadConfig } from './config.js';
+import { startWatchdog } from './watchdog.js';
 import { initClient, logNodeHealth } from './hive/client.js';
 import { fetchTrustGraph } from './hive/trustApi.js';
 import { getVoterRoots, getBootstrapRoots, getAuthorizedRejectors } from './trust/voters.js';
@@ -16,6 +17,8 @@ import { getFollowing, syncFollows } from './hive/follows.js';
 import type { Config, EligibleNewbie, LotteryRound, SelectedNewbie } from './types.js';
 
 async function main(): Promise<void> {
+  // Force exit if the run hangs, so a blocked call can't dead-man future runs.
+  startWatchdog(30);
   console.log('=== Hive Swarm Post Bot ===');
   console.log(`Time: ${new Date().toISOString()}`);
 

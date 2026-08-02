@@ -1,10 +1,14 @@
 import { loadConfig, loadRcDelegationConfig } from './config.js';
+import { startWatchdog } from './watchdog.js';
 import { initClient, logNodeHealth } from './hive/client.js';
 import { buildEligibleContext } from './newbies/pool.js';
 import { runRcDelegationCycle } from './rc/delegate.js';
 import { todayUTC } from './scheduler.js';
 
 async function main(): Promise<void> {
+  // Force exit if the run hangs, so a blocked call can't dead-man future runs.
+  // The normal RC run has taken ~14m, so keep well clear of that.
+  startWatchdog(30);
   console.log('=== Hive Swarm RC Delegation ===');
   console.log(`Time: ${new Date().toISOString()}`);
 

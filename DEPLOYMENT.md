@@ -118,14 +118,23 @@ fly machine status <machine-id> -a hive-swarm-post
 **Known failure mode: a scheduled machine silently stops firing.** If a run hangs, the machine
 stays in state `started` and Fly will not fire the next scheduled run — the bot goes quiet
 with no error anywhere. Symptom: `LAST UPDATED` days stale in `fly machines list`, and an
-event log whose most recent entry is a `start` with no matching `exit`.
+event log whose most recent entry is a `start` with no matching `exit`. Root cause seen in
+Jul 2026: a network read blocked forever (STAT `S`, no CPU) past dhive's 30s request timeout,
+so the process never exited — confirmed by `fly machine exec <id> "ps -A"` showing the
+`node dist/...` process asleep for days.
 
-Check this *first* when a bot appears to have stopped working, before digging into eligibility
-or trust-graph logic. Recover by restarting the machine:
+All three entry points now arm a **watchdog** (`src/watchdog.ts`, `startWatchdog(30)`) that
+forces `exit(1)` after 30 minutes (override with `RUN_TIMEOUT_MINUTES`). A hung run now
+self-terminates, Fly's on-failure restart fires, and the machine returns to `stopped` so the
+next schedule runs — instead of the job dying silently for a week. Should a run still wedge,
+recover manually:
 
 ```bash
 fly machine restart <machine-id> -a hive-swarm-post
 ```
+
+Check the machine state *first* when a bot appears to have stopped working, before digging
+into eligibility or trust-graph logic.
 
 Log retention is short, so a hung run's output is usually gone by the time you notice. For a
 manual run against production data without broadcasting, use `DRY_RUN=true` locally instead:

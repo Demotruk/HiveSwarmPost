@@ -1,4 +1,5 @@
 import { loadReblogFeedConfig } from './config.js';
+import { startWatchdog } from './watchdog.js';
 import { initClient, logNodeHealth } from './hive/client.js';
 import { fetchTrustGraph } from './hive/trustApi.js';
 import { getVoterRoots, getBootstrapRoots } from './trust/voters.js';
@@ -10,6 +11,8 @@ import { runPersonalFeedCycle } from './reblog/personalFeed.js';
 import type { Config } from './types.js';
 
 async function main(): Promise<void> {
+  // Force exit if the run hangs, so a blocked call can't dead-man future runs.
+  startWatchdog(30);
   console.log('=== Reblog Feed Bots ===');
   console.log(`Time: ${new Date().toISOString()}`);
 
